@@ -917,6 +917,10 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
         Dashboard
       </div>
+      <div class="nav-item" data-page="ordini">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Ordini
+      </div>
       <div class="nav-item" data-page="lotti">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M12 12v6M9 15h6"/></svg>
         Produzione &amp; Lotti
@@ -924,6 +928,10 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
       <div class="nav-item" data-page="spedizioni">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 16V8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/><path d="M16 10h3a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1"/><circle cx="9" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>
         Spedizioni
+      </div>
+      <div class="nav-item" data-page="fatturazione">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+        Fatturazione
       </div>
       <div class="nav-item" data-page="haccp">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -994,9 +1002,9 @@ const KITCHEN_KEY = 'brioche-lab-kitchen';
 
 const DEFAULT_DATA = {
   prodotti: [
-    { id: 'p1', codice: 'CRC', nome: 'Cornetto classico', pesoPezzo: 60, pezziCartone: 20, tmcMesi: 12 },
-    { id: 'p2', codice: 'CRV', nome: 'Cornetto vuoto', pesoPezzo: 55, pezziCartone: 20, tmcMesi: 12 },
-    { id: 'p3', codice: 'PNC', nome: 'Pain au chocolat', pesoPezzo: 70, pezziCartone: 20, tmcMesi: 12 },
+    { id: 'p1', codice: 'CRC', nome: 'Cornetto classico', pesoPezzo: 60, pezziCartone: 20, tmcMesi: 12, prezzoDefault: 0, aliquotaIva: 10 },
+    { id: 'p2', codice: 'CRV', nome: 'Cornetto vuoto', pesoPezzo: 55, pezziCartone: 20, tmcMesi: 12, prezzoDefault: 0, aliquotaIva: 10 },
+    { id: 'p3', codice: 'PNC', nome: 'Pain au chocolat', pesoPezzo: 70, pezziCartone: 20, tmcMesi: 12, prezzoDefault: 0, aliquotaIva: 10 },
   ],
   materie: [
     { id: 'm1', nome: 'Farina 00', unita: 'kg', lottoFornitore: '', fornitore: '', dataConsegna: '', scorta: 0, scortaMin: 10 },
@@ -1010,20 +1018,50 @@ const DEFAULT_DATA = {
   lotti: [],
   spedizioni: [],
   haccp: [],
+  ordini: [],
+  fatture: [],
+  emailLog: [],
   config: {
     azienda: 'La mia azienda S.r.l.',
     indirizzo: 'Via Esempio 1, 00000 Città',
     piva: '',
+    codiceFiscale: '',
     operatoreCorrente: '',
+    emailjs: { serviceId: '', templateId: '', publicKey: '' },
+    fatturazione: {
+      ivaDefault: 10,
+      bollo: 2,
+      bolloSoglia: 77.47,
+      prefissoFattura: 'FT',
+      prossimoNumero: 1,
+      annoFiscale: new Date().getFullYear(),
+      iban: '',
+      pec: '',
+      codiceDestinatario: '0000000',
+      regimeFiscale: 'RF01',
+    }
   },
   meta: {
     ultimaSincronizzazione: null,
-    versioneApp: '1.0',
+    versioneApp: '1.1',
     deviceId: '',
   }
 };
 
 let data = loadData();
+
+function deepMergeDefaults(defaults, override) {
+  if (override == null) return JSON.parse(JSON.stringify(defaults));
+  if (Array.isArray(defaults) || typeof defaults !== 'object') return override;
+  const out = {};
+  for (const k of Object.keys(defaults)) {
+    out[k] = (k in override) ? deepMergeDefaults(defaults[k], override[k]) : JSON.parse(JSON.stringify(defaults[k]));
+  }
+  for (const k of Object.keys(override)) {
+    if (!(k in out)) out[k] = override[k];
+  }
+  return out;
+}
 
 function loadData() {
   try {
@@ -1034,8 +1072,7 @@ function loadData() {
       return fresh;
     }
     const parsed = JSON.parse(raw);
-    const merged = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
-    if (!merged.meta) merged.meta = JSON.parse(JSON.stringify(DEFAULT_DATA.meta));
+    const merged = deepMergeDefaults(DEFAULT_DATA, parsed);
     if (!merged.meta.deviceId) merged.meta.deviceId = 'dev-' + Math.random().toString(36).slice(2, 10);
     return merged;
   } catch(e) {
@@ -1099,6 +1136,80 @@ function escapeHtml(s) {
   return String(s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function escapeXml(s) {
+  if (s == null) return '';
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+function fmtEur(n) {
+  const v = Number(n) || 0;
+  return v.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+}
+
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PRICING — Listino default + scaglioni per cliente
+   ════════════════════════════════════════════════════════════════════ */
+function getPrezzoCliente(clienteId, prodottoId, quantita) {
+  const qta = parseInt(quantita) || 0;
+  const cliente = data.clienti.find(c => c.id === clienteId);
+  const prodotto = data.prodotti.find(p => p.id === prodottoId);
+  if (!prodotto) return 0;
+
+  if (cliente && Array.isArray(cliente.listino)) {
+    const voce = cliente.listino.find(v => v.prodottoId === prodottoId);
+    if (voce && Array.isArray(voce.scaglioni) && voce.scaglioni.length > 0) {
+      const scaglioniOrdinati = [...voce.scaglioni].sort((a, b) => (a.minQta || 0) - (b.minQta || 0));
+      let prezzo = null;
+      for (const s of scaglioniOrdinati) {
+        if (qta >= (s.minQta || 0)) prezzo = s.prezzo;
+      }
+      if (prezzo != null) return Number(prezzo) || 0;
+    }
+  }
+  return Number(prodotto.prezzoDefault) || 0;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ORDER / INVOICE NUMBERING
+   ════════════════════════════════════════════════════════════════════ */
+function generateOrdineNumero() {
+  const anno = new Date().getFullYear();
+  const sameYear = data.ordini.filter(o => (o.numero || '').includes(`-${anno}-`));
+  const next = sameYear.length + 1;
+  return `ORD-${anno}-${String(next).padStart(3, '0')}`;
+}
+
+function generateFatturaNumero() {
+  const f = data.config.fatturazione;
+  const anno = f.annoFiscale || new Date().getFullYear();
+  const num = f.prossimoNumero || 1;
+  return `${f.prefissoFattura || 'FT'}-${anno}-${String(num).padStart(3, '0')}`;
+}
+
+const ORDINE_STATI = [
+  { value: 'ricevuto',     label: 'Ricevuto',     pill: 'pill' },
+  { value: 'produzione',   label: 'In produzione', pill: 'pill pill--amber' },
+  { value: 'pronto',       label: 'Pronto',       pill: 'pill pill--green' },
+  { value: 'spedito',      label: 'Spedito',      pill: 'pill' },
+  { value: 'annullato',    label: 'Annullato',    pill: 'pill pill--red' },
+];
+
+function statoOrdineLabel(stato) {
+  const s = ORDINE_STATI.find(x => x.value === stato);
+  return s ? s.label : stato;
+}
+
+function statoOrdinePill(stato) {
+  const s = ORDINE_STATI.find(x => x.value === stato);
+  return s ? `<span class="${s.pill}">${s.label}</span>` : `<span class="pill">${escapeHtml(stato || '—')}</span>`;
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1169,6 +1280,7 @@ function closeSidebar() {
    ROUTER
    ════════════════════════════════════════════════════════════════════ */
 let currentPage = 'dashboard';
+let currentClienteId = null;
 
 document.getElementById('navMenu').addEventListener('click', (e) => {
   const item = e.target.closest('.nav-item');
@@ -1186,6 +1298,11 @@ function navigateTo(page) {
   window.scrollTo(0, 0);
 }
 
+function apriCliente(id) {
+  currentClienteId = id;
+  navigateTo('cliente');
+}
+
 function render() {
   const main = document.getElementById('mainContent');
   switch (currentPage) {
@@ -1194,8 +1311,11 @@ function render() {
     case 'prodotti': main.innerHTML = renderProdotti(); break;
     case 'materie': main.innerHTML = renderMaterie(); break;
     case 'clienti': main.innerHTML = renderClienti(); break;
+    case 'cliente': main.innerHTML = renderClienteDettaglio(currentClienteId); break;
     case 'spedizioni': main.innerHTML = renderSpedizioni(); break;
     case 'haccp': main.innerHTML = renderHaccp(); break;
+    case 'ordini': main.innerHTML = renderOrdini(); break;
+    case 'fatturazione': main.innerHTML = renderFatturazione(); break;
     case 'guida': main.innerHTML = renderGuida(); break;
     case 'sync': main.innerHTML = renderSync(); break;
     case 'dati': main.innerHTML = renderDati(); break;
@@ -1214,6 +1334,10 @@ function renderDashboard() {
   const materieScarse = data.materie.filter(m => parseFloat(m.scorta) < parseFloat(m.scortaMin)).length;
   const ultimiLotti = [...data.lotti].sort((a, b) => (b.codice || '').localeCompare(a.codice || '')).slice(0, 5);
   const ultimiHaccp = [...data.haccp].sort((a, b) => (b.data + (b.ora||'')).localeCompare(a.data + (a.ora||''))).slice(0, 3);
+  const consegneOggi = data.ordini.filter(o => o.dataConsegna === oggi && o.stato !== 'annullato' && o.stato !== 'spedito')
+    .sort((a, b) => (a.oraConsegna || '99:99').localeCompare(b.oraConsegna || '99:99'));
+  const consegneRitardo = data.ordini.filter(o => o.dataConsegna && o.dataConsegna < oggi && o.stato !== 'spedito' && o.stato !== 'annullato');
+  const insolutiTot = data.fatture.filter(f => !f.pagata).reduce((s, f) => s + (f.totale || 0), 0);
 
   const now = new Date();
   const greeting = now.getHours() < 12 ? 'Buongiorno!' : now.getHours() < 19 ? 'Buon pomeriggio!' : 'Buonasera!';
@@ -1239,6 +1363,16 @@ function renderDashboard() {
       </div>
     ` : ''}
 
+    ${consegneRitardo.length > 0 ? `
+      <div class="banner" style="background:var(--red-bg);border-left-color:var(--red)">
+        <div class="banner-icon" style="background:var(--red)">!</div>
+        <div class="banner-content">
+          <div class="banner-title" style="color:var(--red)">Ordini in ritardo</div>
+          <div>${consegneRitardo.length} ordin${consegneRitardo.length===1?'e':'i'} non ancora spedit${consegneRitardo.length===1?'o':'i'} con data di consegna passata. <a href="#" onclick="navigateTo('ordini');return false;" style="color:var(--navy);font-weight:600">Controlla &rarr;</a></div>
+        </div>
+      </div>
+    ` : ''}
+
     <div class="kpi-grid">
       <div class="kpi">
         <div class="kpi-label">Lotti oggi</div>
@@ -1246,11 +1380,21 @@ function renderDashboard() {
         <div class="kpi-detail">${totPezziOggi} pezzi prodotti</div>
       </div>
       <div class="kpi kpi--blue">
+        <div class="kpi-label">Consegne oggi</div>
+        <div class="kpi-value">${consegneOggi.length}</div>
+        <div class="kpi-detail">${data.ordini.filter(o => o.stato !== 'spedito' && o.stato !== 'annullato').length} ordini aperti</div>
+      </div>
+      <div class="kpi kpi--green">
         <div class="kpi-label">Spedizioni oggi</div>
         <div class="kpi-value">${speOggi}</div>
         <div class="kpi-detail">${data.spedizioni.length} totali</div>
       </div>
-      <div class="kpi kpi--green">
+      <div class="kpi ${insolutiTot > 0 ? 'kpi--red' : ''}">
+        <div class="kpi-label">Insoluti</div>
+        <div class="kpi-value" style="font-size:24px">${fmtEur(insolutiTot)}</div>
+        <div class="kpi-detail">${data.fatture.filter(f => !f.pagata).length} fatture aperte</div>
+      </div>
+      <div class="kpi">
         <div class="kpi-label">Produzione totale</div>
         <div class="kpi-value">${totPezzi.toLocaleString('it-IT')}</div>
         <div class="kpi-detail">pezzi totali</div>
@@ -1261,6 +1405,41 @@ function renderDashboard() {
         <div class="kpi-detail">${materieScarse} sotto scorta</div>
       </div>
     </div>
+
+    ${consegneOggi.length > 0 ? `
+      <div class="section">
+        <div class="section-h">
+          <div>
+            <div class="section-title">🗓 Consegne di oggi</div>
+            <div class="section-subtitle">${consegneOggi.length} ordin${consegneOggi.length===1?'e':'i'} da consegnare</div>
+          </div>
+          <button class="btn btn--ghost btn--small" onclick="navigateTo('ordini')">Vedi tutti →</button>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Orario</th><th>Numero</th><th>Cliente</th><th>Stato</th><th></th></tr></thead>
+            <tbody>
+              ${consegneOggi.map(o => {
+                const cliente = data.clienti.find(c => c.id === o.clienteId);
+                return `
+                  <tr style="cursor:pointer" onclick="if(!event.target.closest('button'))openOrdineModal('${o.id}')">
+                    <td><strong>${o.oraConsegna || '—'}</strong></td>
+                    <td class="mono"><strong>${escapeHtml(o.numero)}</strong></td>
+                    <td>${escapeHtml(cliente?.ragioneSociale || '—')}</td>
+                    <td>${statoOrdinePill(o.stato)}</td>
+                    <td>
+                      <div class="table-actions">
+                        ${o.stato === 'pronto' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();spedisciOrdine('${o.id}')">🚚 Spedisci</button>` : ''}
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ` : ''}
 
     <div class="section">
       <div class="section-h">
@@ -1631,6 +1810,8 @@ function renderProdotti() {
             <th>Peso (g)</th>
             <th>Pz/cartone</th>
             <th>TMC (mesi)</th>
+            <th>Prezzo default</th>
+            <th>IVA</th>
             <th></th>
           </tr>
         </thead>
@@ -1642,6 +1823,8 @@ function renderProdotti() {
               <td>${p.pesoPezzo}</td>
               <td>${p.pezziCartone}</td>
               <td>${p.tmcMesi}</td>
+              <td><strong>${fmtEur(p.prezzoDefault || 0)}</strong></td>
+              <td>${p.aliquotaIva ?? 10}%</td>
               <td>
                 <div class="table-actions">
                   <button class="btn btn--ghost btn--small" onclick="openProdottoModal('${p.id}')">Mod.</button>
@@ -1685,6 +1868,20 @@ function openProdottoModal(id) {
             <input type="number" class="field-input" name="tmcMesi" value="${p?.tmcMesi || 12}" min="1" required inputmode="numeric">
             <div class="field-help">Shelf-life in mesi dalla produzione</div>
           </div>
+          <div class="field">
+            <label class="field-label">Prezzo default (€/pz)</label>
+            <input type="number" class="field-input" name="prezzoDefault" value="${p?.prezzoDefault ?? 0}" min="0" step="0.01" inputmode="decimal">
+            <div class="field-help">Modificabile per ciascun cliente nel listino</div>
+          </div>
+          <div class="field">
+            <label class="field-label">Aliquota IVA (%)</label>
+            <select class="field-select" name="aliquotaIva">
+              <option value="4" ${p?.aliquotaIva===4?'selected':''}>4% (prima necessità)</option>
+              <option value="10" ${(p?.aliquotaIva ?? 10)===10?'selected':''}>10% (pasticceria)</option>
+              <option value="22" ${p?.aliquotaIva===22?'selected':''}>22% (ordinaria)</option>
+              <option value="0" ${p?.aliquotaIva===0?'selected':''}>0% (esente)</option>
+            </select>
+          </div>
         </div>
       </form>
     `,
@@ -1705,6 +1902,8 @@ function saveProdotto(id) {
   p.pesoPezzo = parseInt(fd.get('pesoPezzo'));
   p.pezziCartone = parseInt(fd.get('pezziCartone'));
   p.tmcMesi = parseInt(fd.get('tmcMesi'));
+  p.prezzoDefault = parseFloat(fd.get('prezzoDefault')) || 0;
+  p.aliquotaIva = parseInt(fd.get('aliquotaIva'));
   saveData();
   closeModal();
   render();
@@ -1901,7 +2100,7 @@ function renderClienti() {
           </thead>
           <tbody>
             ${data.clienti.map(c => `
-              <tr>
+              <tr style="cursor:pointer" onclick="if(!event.target.closest('button'))apriCliente('${c.id}')">
                 <td><strong>${escapeHtml(c.ragioneSociale)}</strong></td>
                 <td><span class="pill">${escapeHtml(c.tipo || 'Bar')}</span></td>
                 <td>${escapeHtml(c.indirizzo || '—')}</td>
@@ -1909,8 +2108,9 @@ function renderClienti() {
                 <td>${escapeHtml(c.telefono || '—')}</td>
                 <td>
                   <div class="table-actions">
-                    <button class="btn btn--ghost btn--small" onclick="openClienteModal('${c.id}')">Mod.</button>
-                    <button class="btn btn--danger btn--small" onclick="deleteCliente('${c.id}')">×</button>
+                    <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();apriCliente('${c.id}')">Apri</button>
+                    <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openClienteModal('${c.id}')">Mod.</button>
+                    <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteCliente('${c.id}')">×</button>
                   </div>
                 </td>
               </tr>
@@ -1956,6 +2156,19 @@ function openClienteModal(id) {
             <label class="field-label">Email</label>
             <input type="email" class="field-input" name="email" value="${escapeHtml(c?.email || '')}">
           </div>
+          <div class="field">
+            <label class="field-label">Codice fiscale</label>
+            <input type="text" class="field-input mono" name="codiceFiscale" value="${escapeHtml(c?.codiceFiscale || '')}">
+          </div>
+          <div class="field">
+            <label class="field-label">PEC</label>
+            <input type="email" class="field-input" name="pec" value="${escapeHtml(c?.pec || '')}" placeholder="cliente@pec.it">
+          </div>
+          <div class="field">
+            <label class="field-label">Codice destinatario SDI</label>
+            <input type="text" class="field-input mono" name="codiceDestinatario" value="${escapeHtml(c?.codiceDestinatario || '')}" maxlength="7" placeholder="7 caratteri (0000000)">
+            <div class="field-help">Per FatturaPA: PEC oppure codice destinatario</div>
+          </div>
           <div class="field field--full">
             <label class="field-label">Note</label>
             <textarea class="field-textarea" name="note">${escapeHtml(c?.note || '')}</textarea>
@@ -1973,14 +2186,17 @@ function openClienteModal(id) {
 function saveCliente(id) {
   const form = document.getElementById('cliForm');
   const fd = new FormData(form);
-  const c = id ? data.clienti.find(x => x.id === id) : { id: uid() };
+  const c = id ? data.clienti.find(x => x.id === id) : { id: uid(), listino: [] };
   if (!id) data.clienti.push(c);
   c.ragioneSociale = fd.get('ragioneSociale');
   c.tipo = fd.get('tipo');
   c.piva = fd.get('piva');
+  c.codiceFiscale = fd.get('codiceFiscale');
   c.indirizzo = fd.get('indirizzo');
   c.telefono = fd.get('telefono');
   c.email = fd.get('email');
+  c.pec = fd.get('pec');
+  c.codiceDestinatario = fd.get('codiceDestinatario');
   c.note = fd.get('note');
   saveData();
   closeModal();
@@ -2043,6 +2259,8 @@ function renderSpedizioni() {
               <th>Cliente</th>
               <th>Lotto</th>
               <th>Q.tà</th>
+              <th>Importo</th>
+              <th>Stato</th>
               <th></th>
             </tr>
           </thead>
@@ -2050,6 +2268,9 @@ function renderSpedizioni() {
             ${speds.map(s => {
               const cliente = data.clienti.find(c => c.id === s.clienteId);
               const lotto = data.lotti.find(l => l.id === s.lottoId);
+              const prezzo = Number(s.prezzoUnitario) || 0;
+              const importo = prezzo * (Number(s.quantita) || 0);
+              const fatturato = !!s.fatturaId;
               return `
                 <tr>
                   <td>${fmtDate(s.data)}</td>
@@ -2057,6 +2278,8 @@ function renderSpedizioni() {
                   <td>${escapeHtml(cliente?.ragioneSociale || '— eliminato —')}</td>
                   <td class="mono">${escapeHtml(lotto?.codice || '— eliminato —')}</td>
                   <td><strong>${s.quantita}</strong> pz</td>
+                  <td>${importo > 0 ? fmtEur(importo) : '—'}</td>
+                  <td>${fatturato ? '<span class="pill pill--green">Fatturato</span>' : '<span class="pill pill--amber">Da fatturare</span>'}</td>
                   <td>
                     <div class="table-actions">
                       <button class="btn btn--ghost btn--small" onclick="openSpedModal('${s.id}')">Mod.</button>
@@ -2073,14 +2296,30 @@ function renderSpedizioni() {
   `;
 }
 
-function openSpedModal(id) {
+function openSpedModal(id, prefill) {
   const s = id ? data.spedizioni.find(x => x.id === id) : null;
   const oggi = new Date().toISOString().slice(0, 10);
   const nextDdt = `DDT-${new Date().getFullYear()}-${String(data.spedizioni.length + 1).padStart(3, '0')}`;
+  const clienteId = s?.clienteId || prefill?.clienteId || '';
+  const lottoId = s?.lottoId || prefill?.lottoId || '';
+  const quantita = s?.quantita || prefill?.quantita || '';
+  const ordineId = s?.ordineId || prefill?.ordineId || '';
+  const prezzoUnit = s?.prezzoUnitario ?? prefill?.prezzoUnitario ?? '';
+  const note = s?.note || prefill?.note || '';
   showModal({
     title: s ? 'Modifica spedizione' : 'Nuova spedizione',
     body: `
       <form id="spedForm">
+        ${prefill?.ordineNumero ? `
+          <div class="banner banner--info">
+            <div class="banner-icon">i</div>
+            <div class="banner-content">
+              <div class="banner-title">Spedizione da ordine ${escapeHtml(prefill.ordineNumero)}</div>
+              <div>Dopo il salvataggio l'ordine passerà allo stato "Spedito".</div>
+            </div>
+          </div>
+        ` : ''}
+        <input type="hidden" name="ordineId" value="${escapeHtml(ordineId)}">
         <div class="form-grid">
           <div class="field">
             <label class="field-label">Data spedizione</label>
@@ -2094,23 +2333,28 @@ function openSpedModal(id) {
             <label class="field-label">Cliente</label>
             <select class="field-select" name="clienteId" required>
               <option value="">— Seleziona cliente —</option>
-              ${data.clienti.map(c => `<option value="${c.id}" ${s?.clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
+              ${data.clienti.map(c => `<option value="${c.id}" ${clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
             </select>
           </div>
           <div class="field field--full">
             <label class="field-label">Lotto spedito</label>
             <select class="field-select" name="lottoId" required>
               <option value="">— Seleziona lotto —</option>
-              ${[...data.lotti].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(l => `<option value="${l.id}" ${s?.lottoId===l.id?'selected':''}>${escapeHtml(l.codice)} — ${escapeHtml(l.prodottoNome)} (${l.quantita} pz)</option>`).join('')}
+              ${[...data.lotti].sort((a,b)=>(b.data||'').localeCompare(a.data||'')).map(l => `<option value="${l.id}" ${lottoId===l.id?'selected':''}>${escapeHtml(l.codice)} — ${escapeHtml(l.prodottoNome)} (${l.quantita} pz)</option>`).join('')}
             </select>
           </div>
           <div class="field">
             <label class="field-label">Quantità (pz)</label>
-            <input type="number" class="field-input" name="quantita" value="${s?.quantita || ''}" min="1" required inputmode="numeric">
+            <input type="number" class="field-input" name="quantita" value="${quantita}" min="1" required inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="field-label">Prezzo unitario (€)</label>
+            <input type="number" class="field-input" name="prezzoUnitario" value="${prezzoUnit}" min="0" step="0.01" inputmode="decimal">
+            <div class="field-help">Lasciato vuoto → calcolato dal listino del cliente</div>
           </div>
           <div class="field field--full">
             <label class="field-label">Note</label>
-            <textarea class="field-textarea" name="note">${escapeHtml(s?.note || '')}</textarea>
+            <textarea class="field-textarea" name="note">${escapeHtml(note)}</textarea>
           </div>
         </div>
       </form>
@@ -2133,6 +2377,29 @@ function saveSped(id) {
   s.lottoId = fd.get('lottoId');
   s.quantita = parseInt(fd.get('quantita'));
   s.note = fd.get('note');
+  const ordineId = fd.get('ordineId');
+  if (ordineId) s.ordineId = ordineId;
+  const lotto = data.lotti.find(l => l.id === s.lottoId);
+  if (lotto) s.prodottoId = lotto.prodottoId;
+  const prezzoInserito = parseFloat(fd.get('prezzoUnitario'));
+  if (!isNaN(prezzoInserito) && prezzoInserito >= 0) {
+    s.prezzoUnitario = prezzoInserito;
+  } else if (s.clienteId && s.prodottoId) {
+    s.prezzoUnitario = getPrezzoCliente(s.clienteId, s.prodottoId, s.quantita);
+  } else {
+    s.prezzoUnitario = 0;
+  }
+  s.fatturaId = s.fatturaId || null;
+
+  if (ordineId) {
+    const ordine = data.ordini.find(o => o.id === ordineId);
+    if (ordine) {
+      ordine.ddtIds = ordine.ddtIds || [];
+      if (!ordine.ddtIds.includes(s.id)) ordine.ddtIds.push(s.id);
+      ordine.stato = 'spedito';
+    }
+  }
+
   saveData();
   closeModal();
   render();
@@ -2145,6 +2412,1252 @@ function deleteSped(id) {
   saveData();
   render();
   toast('Spedizione eliminata', 'info');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PAGE: ORDINI
+   ════════════════════════════════════════════════════════════════════ */
+let ordiniFilter = { search: '', clienteId: '', stato: '' };
+
+function renderOrdini() {
+  let ordini = [...data.ordini];
+  if (ordiniFilter.search) {
+    const q = ordiniFilter.search.toLowerCase();
+    ordini = ordini.filter(o => {
+      const cliente = data.clienti.find(c => c.id === o.clienteId);
+      return (o.numero || '').toLowerCase().includes(q) ||
+             (cliente?.ragioneSociale || '').toLowerCase().includes(q) ||
+             (o.note || '').toLowerCase().includes(q);
+    });
+  }
+  if (ordiniFilter.clienteId) ordini = ordini.filter(o => o.clienteId === ordiniFilter.clienteId);
+  if (ordiniFilter.stato) ordini = ordini.filter(o => o.stato === ordiniFilter.stato);
+  ordini.sort((a,b) => (b.data || '').localeCompare(a.data || ''));
+
+  const totaleOrdine = (o) => (o.righe || []).reduce((s,r) => s + (parseFloat(r.prezzo)||0) * (parseInt(r.quantita)||0), 0);
+
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Ordini</div>
+        <div class="page-subtitle">${data.ordini.length} ordini totali · ${ordini.length} mostrati</div>
+      </div>
+      <button class="btn btn--amber" onclick="openOrdineModal()" ${data.clienti.length===0?'disabled':''}>+ Nuovo ordine</button>
+    </div>
+
+    ${data.clienti.length === 0 ? `
+      <div class="banner">
+        <div class="banner-icon">!</div>
+        <div class="banner-content">
+          <div class="banner-title">Aggiungi prima un cliente</div>
+          <div>Per registrare ordini devi avere almeno un cliente. <a href="#" onclick="navigateTo('clienti');return false;" style="color:var(--navy);font-weight:600">Vai a Clienti →</a></div>
+        </div>
+      </div>
+    ` : ''}
+
+    <div class="card" style="margin-bottom:20px">
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">Cerca</label>
+          <input type="text" class="field-input" placeholder="Numero, cliente, note..."
+            value="${escapeHtml(ordiniFilter.search)}" oninput="ordiniFilter.search=this.value;render()">
+        </div>
+        <div class="field">
+          <label class="field-label">Cliente</label>
+          <select class="field-select" onchange="ordiniFilter.clienteId=this.value;render()">
+            <option value="">Tutti</option>
+            ${data.clienti.map(c => `<option value="${c.id}" ${ordiniFilter.clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Stato</label>
+          <select class="field-select" onchange="ordiniFilter.stato=this.value;render()">
+            <option value="">Tutti</option>
+            ${ORDINE_STATI.map(s => `<option value="${s.value}" ${ordiniFilter.stato===s.value?'selected':''}>${s.label}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    </div>
+
+    ${ordini.length === 0 ? `
+      <div class="card empty">
+        <div class="empty-icon">📋</div>
+        <div class="empty-title">${data.ordini.length === 0 ? 'Nessun ordine registrato' : 'Nessun risultato'}</div>
+        <div class="empty-text">${data.ordini.length === 0
+          ? 'Registra ogni ordine ricevuto: ti aiuta a pianificare la produzione e fatturare correttamente.'
+          : 'Modifica i filtri per vedere altri risultati.'}</div>
+        ${data.ordini.length === 0 && data.clienti.length > 0 ? `<button class="btn btn--amber" onclick="openOrdineModal()">Crea il primo ordine</button>` : ''}
+      </div>
+    ` : `
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Numero</th>
+              <th>Data</th>
+              <th>Cliente</th>
+              <th>Consegna</th>
+              <th>Righe</th>
+              <th>Totale</th>
+              <th>Stato</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ordini.map(o => {
+              const cliente = data.clienti.find(c => c.id === o.clienteId);
+              const totale = totaleOrdine(o);
+              const consegnaOggi = o.dataConsegna === new Date().toISOString().slice(0,10);
+              const inRitardo = o.dataConsegna && o.dataConsegna < new Date().toISOString().slice(0,10) && o.stato !== 'spedito' && o.stato !== 'annullato';
+              return `
+                <tr style="cursor:pointer" onclick="if(!event.target.closest('button'))openOrdineModal('${o.id}')">
+                  <td class="mono"><strong>${escapeHtml(o.numero || '—')}</strong></td>
+                  <td>${fmtDate(o.data)}</td>
+                  <td>${escapeHtml(cliente?.ragioneSociale || '— eliminato —')}</td>
+                  <td>
+                    ${o.dataConsegna ? `<strong style="color:${inRitardo?'var(--red)':consegnaOggi?'var(--amber-dark)':'inherit'}">${fmtDate(o.dataConsegna)}</strong>` : '—'}
+                    ${o.oraConsegna ? `<span style="color:var(--muted);font-size:12px"> · ${o.oraConsegna}</span>` : ''}
+                  </td>
+                  <td>${(o.righe || []).length}</td>
+                  <td><strong>${fmtEur(totale)}</strong></td>
+                  <td>${statoOrdinePill(o.stato)}</td>
+                  <td>
+                    <div class="table-actions">
+                      ${o.stato === 'pronto' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();spedisciOrdine('${o.id}')" title="Crea DDT">🚚 Spedisci</button>` : ''}
+                      <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openOrdineModal('${o.id}')">${o.stato==='spedito'?'Vedi':'Mod.'}</button>
+                      <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteOrdine('${o.id}')">×</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `}
+  `;
+}
+
+function ordineRigaHTML(idx, riga) {
+  const opts = data.prodotti.map(p => `<option value="${p.id}" ${riga?.prodottoId===p.id?'selected':''}>${escapeHtml(p.nome)} (${p.codice})</option>`).join('');
+  return `
+    <div class="ord-riga" data-idx="${idx}" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:10px;padding:10px;background:var(--light-bg);border-radius:8px">
+      <div class="field" style="margin:0">
+        <label class="field-label" style="font-size:10px">Prodotto</label>
+        <select class="field-select" name="prodottoId" onchange="onOrdineRigaChange(${idx})">
+          <option value="">— Seleziona —</option>
+          ${opts}
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label class="field-label" style="font-size:10px">Quantità</label>
+        <input type="number" class="field-input" name="quantita" value="${riga?.quantita || ''}" min="1" inputmode="numeric" oninput="onOrdineRigaChange(${idx})">
+      </div>
+      <div class="field" style="margin:0">
+        <label class="field-label" style="font-size:10px">Prezzo unit. €</label>
+        <input type="number" class="field-input" name="prezzo" value="${riga?.prezzo ?? ''}" min="0" step="0.01" inputmode="decimal" oninput="aggiornaTotaleOrdine()">
+      </div>
+      <div class="field" style="margin:0">
+        <label class="field-label" style="font-size:10px">Subtot.</label>
+        <input type="text" class="field-input mono" name="subtot" value="${riga?.prezzo && riga?.quantita ? fmtEur(riga.prezzo * riga.quantita) : '—'}" readonly>
+      </div>
+      <button type="button" class="btn btn--danger btn--small" onclick="rimuoviRigaOrdine(${idx})" title="Rimuovi riga">×</button>
+    </div>
+  `;
+}
+
+let ordineDraftRighe = [];
+
+function onOrdineRigaChange(idx) {
+  const form = document.getElementById('ordineForm');
+  if (!form) return;
+  const clienteId = form.querySelector('[name="clienteId"]').value;
+  const righe = form.querySelectorAll('.ord-riga');
+  const riga = righe[idx];
+  if (!riga) return;
+  const prodottoId = riga.querySelector('[name="prodottoId"]').value;
+  const quantita = parseInt(riga.querySelector('[name="quantita"]').value) || 0;
+  if (clienteId && prodottoId && quantita > 0) {
+    const prezzoInput = riga.querySelector('[name="prezzo"]');
+    if (!prezzoInput.dataset.touched) {
+      prezzoInput.value = getPrezzoCliente(clienteId, prodottoId, quantita).toFixed(2);
+    }
+  }
+  aggiornaTotaleOrdine();
+}
+
+function aggiornaTotaleOrdine() {
+  const form = document.getElementById('ordineForm');
+  if (!form) return;
+  let tot = 0;
+  form.querySelectorAll('.ord-riga').forEach(r => {
+    const q = parseInt(r.querySelector('[name="quantita"]').value) || 0;
+    const p = parseFloat(r.querySelector('[name="prezzo"]').value) || 0;
+    const sub = q * p;
+    r.querySelector('[name="subtot"]').value = sub > 0 ? fmtEur(sub) : '—';
+    tot += sub;
+  });
+  const totEl = document.getElementById('ordineTotale');
+  if (totEl) totEl.textContent = fmtEur(tot);
+  form.querySelectorAll('[name="prezzo"]').forEach(inp => {
+    inp.addEventListener('input', () => { inp.dataset.touched = '1'; }, { once: true });
+  });
+}
+
+function aggiungiRigaOrdine() {
+  ordineDraftRighe.push({ prodottoId: '', quantita: '', prezzo: '' });
+  rerenderOrdineRighe();
+}
+
+function rimuoviRigaOrdine(idx) {
+  const form = document.getElementById('ordineForm');
+  if (!form) return;
+  ordineDraftRighe = leggiRigheDaForm();
+  ordineDraftRighe.splice(idx, 1);
+  rerenderOrdineRighe();
+}
+
+function leggiRigheDaForm() {
+  const form = document.getElementById('ordineForm');
+  if (!form) return [];
+  return Array.from(form.querySelectorAll('.ord-riga')).map(r => ({
+    prodottoId: r.querySelector('[name="prodottoId"]').value,
+    quantita: parseInt(r.querySelector('[name="quantita"]').value) || 0,
+    prezzo: parseFloat(r.querySelector('[name="prezzo"]').value) || 0,
+  }));
+}
+
+function rerenderOrdineRighe() {
+  const cont = document.getElementById('ordineRighe');
+  if (!cont) return;
+  cont.innerHTML = ordineDraftRighe.map((r, i) => ordineRigaHTML(i, r)).join('');
+  aggiornaTotaleOrdine();
+}
+
+function openOrdineModal(id) {
+  const o = id ? data.ordini.find(x => x.id === id) : null;
+  const oggi = new Date().toISOString().slice(0, 10);
+  const readonly = o?.stato === 'spedito';
+  ordineDraftRighe = o ? [...(o.righe || [])] : [];
+  if (ordineDraftRighe.length === 0) ordineDraftRighe.push({ prodottoId: '', quantita: '', prezzo: '' });
+
+  showModal({
+    title: o ? (readonly ? `Ordine ${o.numero} (spedito)` : `Modifica ordine ${o.numero}`) : 'Nuovo ordine',
+    body: `
+      ${readonly ? `
+        <div class="banner banner--info">
+          <div class="banner-icon">i</div>
+          <div class="banner-content">
+            <div class="banner-title">Ordine già spedito</div>
+            <div>Questo ordine ha generato un DDT e non può più essere modificato. Per correzioni, modifica il DDT collegato.</div>
+          </div>
+        </div>
+      ` : ''}
+      <form id="ordineForm" ${readonly ? 'onsubmit="return false"' : ''}>
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label">Data ordine</label>
+            <input type="date" class="field-input" name="data" value="${o?.data || oggi}" required ${readonly?'disabled':''}>
+          </div>
+          <div class="field">
+            <label class="field-label">Numero ordine</label>
+            <input type="text" class="field-input mono" name="numero" value="${escapeHtml(o?.numero || generateOrdineNumero())}" required ${readonly?'disabled':''}>
+          </div>
+          <div class="field field--full">
+            <label class="field-label">Cliente</label>
+            <select class="field-select" name="clienteId" required ${readonly?'disabled':''} onchange="onOrdineRigaChange(0)">
+              <option value="">— Seleziona cliente —</option>
+              ${data.clienti.map(c => `<option value="${c.id}" ${o?.clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label">Data consegna prevista</label>
+            <input type="date" class="field-input" name="dataConsegna" value="${o?.dataConsegna || ''}" required ${readonly?'disabled':''}>
+          </div>
+          <div class="field">
+            <label class="field-label">Orario consegna (opzionale)</label>
+            <input type="time" class="field-input" name="oraConsegna" value="${o?.oraConsegna || ''}" ${readonly?'disabled':''}>
+          </div>
+          <div class="field">
+            <label class="field-label">Stato</label>
+            <select class="field-select" name="stato" ${readonly?'disabled':''}>
+              ${ORDINE_STATI.map(s => `<option value="${s.value}" ${(o?.stato || 'ricevuto')===s.value?'selected':''}>${s.label}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <div class="field-label" style="margin:0">Righe ordine</div>
+            ${!readonly ? `<button type="button" class="btn btn--ghost btn--small" onclick="aggiungiRigaOrdine()">+ Aggiungi riga</button>` : ''}
+          </div>
+          <div id="ordineRighe">
+            ${ordineDraftRighe.map((r, i) => ordineRigaHTML(i, r)).join('')}
+          </div>
+          <div style="display:flex;justify-content:flex-end;align-items:baseline;gap:12px;margin-top:10px;padding:12px;background:var(--amber-bg);border-radius:8px">
+            <span style="font-weight:700;color:var(--navy)">TOTALE ORDINE</span>
+            <span id="ordineTotale" style="font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:var(--navy)">€0,00</span>
+          </div>
+        </div>
+
+        <div class="field field--full" style="margin-top:16px">
+          <label class="field-label">Note</label>
+          <textarea class="field-textarea" name="note" ${readonly?'disabled':''} placeholder="Es. consegnare prima delle 8, lasciare in dispensa...">${escapeHtml(o?.note || '')}</textarea>
+        </div>
+      </form>
+    `,
+    footer: readonly ? `
+      <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
+    ` : `
+      <button class="btn btn--ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn btn--amber" onclick="saveOrdine('${id || ''}')">${o ? 'Salva modifiche' : 'Crea ordine'}</button>
+    `
+  });
+  setTimeout(aggiornaTotaleOrdine, 50);
+}
+
+function saveOrdine(id) {
+  const form = document.getElementById('ordineForm');
+  const fd = new FormData(form);
+  const clienteId = fd.get('clienteId');
+  if (!clienteId) { toast('Seleziona un cliente', 'error'); return; }
+  const dataConsegna = fd.get('dataConsegna');
+  if (!dataConsegna) { toast('Inserisci la data di consegna', 'error'); return; }
+
+  const righe = leggiRigheDaForm().filter(r => r.prodottoId && r.quantita > 0);
+  if (righe.length === 0) { toast('Aggiungi almeno una riga valida', 'error'); return; }
+
+  let o = id ? data.ordini.find(x => x.id === id) : null;
+  if (!o) {
+    o = { id: uid(), createdAt: new Date().toISOString(), ddtIds: [] };
+    data.ordini.push(o);
+  }
+  o.numero = fd.get('numero');
+  o.data = fd.get('data');
+  o.clienteId = clienteId;
+  o.dataConsegna = dataConsegna;
+  o.oraConsegna = fd.get('oraConsegna');
+  o.stato = fd.get('stato') || 'ricevuto';
+  o.note = fd.get('note');
+  o.righe = righe;
+
+  saveData();
+  closeModal();
+  render();
+  toast(id ? 'Ordine aggiornato' : `Ordine ${o.numero} creato`);
+}
+
+function deleteOrdine(id) {
+  const o = data.ordini.find(x => x.id === id);
+  if (!o) return;
+  if (!confirm(`Eliminare l'ordine ${o.numero}?`)) return;
+  data.ordini = data.ordini.filter(x => x.id !== id);
+  saveData();
+  render();
+  toast('Ordine eliminato', 'info');
+}
+
+function spedisciOrdine(id) {
+  const o = data.ordini.find(x => x.id === id);
+  if (!o) return;
+  if (data.lotti.length === 0) {
+    toast('Devi prima registrare almeno un lotto di produzione', 'error');
+    return;
+  }
+  const totRiga = o.righe?.[0];
+  openSpedModal(null, {
+    ordineId: o.id,
+    ordineNumero: o.numero,
+    clienteId: o.clienteId,
+    quantita: totRiga?.quantita || '',
+    prezzoUnitario: totRiga?.prezzo || '',
+    note: `Ordine ${o.numero}` + (o.note ? '\n' + o.note : ''),
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PAGE: FATTURAZIONE
+   ════════════════════════════════════════════════════════════════════ */
+let fatturazioneTab = 'da-fatturare';
+let fattureFilter = { mese: '', clienteId: '', stato: '' };
+
+function renderFatturazione() {
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Fatturazione</div>
+        <div class="page-subtitle">Aggrega DDT del mese in fatture pro-forma / FatturaPA</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--grey-bord)">
+      <button class="btn ${fatturazioneTab==='da-fatturare'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="fatturazioneTab='da-fatturare';render()">📋 Da fatturare</button>
+      <button class="btn ${fatturazioneTab==='emesse'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="fatturazioneTab='emesse';render()">🧾 Emesse (${data.fatture.length})</button>
+    </div>
+
+    ${fatturazioneTab === 'da-fatturare' ? renderDaFatturare() : renderFattureEmesse()}
+  `;
+}
+
+function renderDaFatturare() {
+  const mese = new Date().toISOString().slice(0, 7);
+  const ddtNonFatturati = data.spedizioni.filter(s => !s.fatturaId);
+  const byCliente = {};
+  ddtNonFatturati.forEach(s => {
+    if (!s.clienteId) return;
+    byCliente[s.clienteId] = byCliente[s.clienteId] || [];
+    byCliente[s.clienteId].push(s);
+  });
+
+  const clientiIds = Object.keys(byCliente);
+
+  if (clientiIds.length === 0) {
+    return `
+      <div class="card empty">
+        <div class="empty-icon">✨</div>
+        <div class="empty-title">Tutto fatturato!</div>
+        <div class="empty-text">Non ci sono DDT in attesa di fatturazione. Quando registrerai nuovi DDT, appariranno qui raggruppati per cliente.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="banner banner--info">
+      <div class="banner-icon">i</div>
+      <div class="banner-content">
+        <div class="banner-title">DDT pronti da fatturare</div>
+        <div>I DDT sono raggruppati per cliente. Premi "Prepara fattura" per generare una fattura unica con tutti i DDT del cliente.</div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:16px">
+      ${clientiIds.map(cid => {
+        const cliente = data.clienti.find(c => c.id === cid);
+        const ddt = byCliente[cid].sort((a,b) => (a.data||'').localeCompare(b.data||''));
+        let totale = 0;
+        let totPezzi = 0;
+        ddt.forEach(d => {
+          const prezzo = Number(d.prezzoUnitario) || 0;
+          totale += prezzo * (Number(d.quantita) || 0);
+          totPezzi += Number(d.quantita) || 0;
+        });
+        return `
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+              <div>
+                <div class="card-h" style="margin-bottom:4px">${escapeHtml(cliente?.ragioneSociale || '— cliente eliminato —')}</div>
+                <div style="color:var(--muted);font-size:13px">${ddt.length} DDT · ${totPezzi} pezzi · <strong style="color:var(--navy)">${fmtEur(totale)}</strong> + IVA</div>
+              </div>
+              <button class="btn btn--amber" onclick="openFatturaPreviewModal('${cid}')" ${!cliente?'disabled':''}>📄 Prepara fattura</button>
+            </div>
+            <div style="margin-top:14px;display:grid;gap:6px;font-size:13px">
+              ${ddt.map(d => {
+                const prezzo = Number(d.prezzoUnitario) || 0;
+                const subt = prezzo * (Number(d.quantita) || 0);
+                return `
+                  <div style="display:flex;justify-content:space-between;padding:6px 10px;background:var(--light-bg);border-radius:6px">
+                    <span><strong class="mono">${escapeHtml(d.ddt || '—')}</strong> · ${fmtDate(d.data)} · ${d.quantita} pz</span>
+                    <span>${subt > 0 ? fmtEur(subt) : '<em style="color:var(--red)">prezzo mancante</em>'}</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderFattureEmesse() {
+  let fatture = [...data.fatture];
+  if (fattureFilter.clienteId) fatture = fatture.filter(f => f.clienteId === fattureFilter.clienteId);
+  if (fattureFilter.stato === 'pagata') fatture = fatture.filter(f => f.pagata);
+  if (fattureFilter.stato === 'non-pagata') fatture = fatture.filter(f => !f.pagata);
+  if (fattureFilter.mese) fatture = fatture.filter(f => (f.data || '').startsWith(fattureFilter.mese));
+  fatture.sort((a,b) => (b.numero || '').localeCompare(a.numero || ''));
+
+  return `
+    <div class="card" style="margin-bottom:20px">
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">Mese</label>
+          <input type="month" class="field-input" value="${fattureFilter.mese}" onchange="fattureFilter.mese=this.value;render()">
+        </div>
+        <div class="field">
+          <label class="field-label">Cliente</label>
+          <select class="field-select" onchange="fattureFilter.clienteId=this.value;render()">
+            <option value="">Tutti</option>
+            ${data.clienti.map(c => `<option value="${c.id}" ${fattureFilter.clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Stato</label>
+          <select class="field-select" onchange="fattureFilter.stato=this.value;render()">
+            <option value="">Tutte</option>
+            <option value="non-pagata" ${fattureFilter.stato==='non-pagata'?'selected':''}>Da pagare</option>
+            <option value="pagata" ${fattureFilter.stato==='pagata'?'selected':''}>Pagate</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    ${fatture.length === 0 ? `
+      <div class="card empty">
+        <div class="empty-icon">🧾</div>
+        <div class="empty-title">Nessuna fattura emessa</div>
+        <div class="empty-text">Quando emetterai la prima fattura, comparirà qui.</div>
+      </div>
+    ` : `
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Numero</th>
+              <th>Data</th>
+              <th>Cliente</th>
+              <th>Imponibile</th>
+              <th>IVA</th>
+              <th>Totale</th>
+              <th>Stato</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${fatture.map(f => {
+              const cliente = data.clienti.find(c => c.id === f.clienteId);
+              return `
+                <tr>
+                  <td class="mono"><strong>${escapeHtml(f.numero)}</strong></td>
+                  <td>${fmtDate(f.data)}</td>
+                  <td>${escapeHtml(cliente?.ragioneSociale || '— eliminato —')}</td>
+                  <td>${fmtEur(f.imponibile || 0)}</td>
+                  <td>${fmtEur(f.iva || 0)}</td>
+                  <td><strong>${fmtEur(f.totale || 0)}</strong></td>
+                  <td>${f.pagata ? `<span class="pill pill--green">✓ Pagata${f.dataPagamento?' '+fmtDate(f.dataPagamento):''}</span>` : '<span class="pill pill--red">Da pagare</span>'}</td>
+                  <td>
+                    <div class="table-actions">
+                      <button class="btn btn--ghost btn--small" onclick="showFatturaPdf('${f.id}')" title="Stampa">🖨</button>
+                      <button class="btn btn--ghost btn--small" onclick="downloadFatturaPA('${f.id}')" title="XML FatturaPA">📥 XML</button>
+                      <button class="btn btn--ghost btn--small" onclick="openEmailModal('${f.id}')" title="Invia email">📧</button>
+                      <button class="btn btn--ghost btn--small" onclick="togglePagamento('${f.id}')">${f.pagata?'Annulla pag.':'Segna pagata'}</button>
+                      <button class="btn btn--danger btn--small" onclick="deleteFattura('${f.id}')">×</button>
+                    </div>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `}
+  `;
+}
+
+function calcolaFattura(clienteId, ddtIds) {
+  const cliente = data.clienti.find(c => c.id === clienteId);
+  const ddt = ddtIds.map(id => data.spedizioni.find(s => s.id === id)).filter(Boolean);
+  const righe = ddt.map(d => {
+    const prodotto = data.prodotti.find(p => p.id === d.prodottoId);
+    const lotto = data.lotti.find(l => l.id === d.lottoId);
+    const prezzo = Number(d.prezzoUnitario) || 0;
+    const quantita = Number(d.quantita) || 0;
+    const aliquota = prodotto?.aliquotaIva ?? data.config.fatturazione.ivaDefault ?? 10;
+    return {
+      ddtId: d.id,
+      ddtNumero: d.ddt,
+      ddtData: d.data,
+      prodottoNome: prodotto?.nome || (lotto?.prodottoNome ?? '—'),
+      prodottoId: prodotto?.id || d.prodottoId,
+      lottoCodice: lotto?.codice || '',
+      quantita,
+      prezzoUnitario: prezzo,
+      aliquota,
+      imponibile: round2(prezzo * quantita),
+      iva: round2(prezzo * quantita * aliquota / 100),
+    };
+  });
+  const imponibile = round2(righe.reduce((s,r) => s + r.imponibile, 0));
+  const iva = round2(righe.reduce((s,r) => s + r.iva, 0));
+  const f = data.config.fatturazione;
+  const bollo = imponibile > (f.bolloSoglia || 77.47) && f.regimeFiscale === 'RF19' ? (Number(f.bollo) || 2) : 0;
+  const totale = round2(imponibile + iva + bollo);
+  return { cliente, righe, imponibile, iva, bollo, totale };
+}
+
+function openFatturaPreviewModal(clienteId, fatturaId) {
+  const f = fatturaId ? data.fatture.find(x => x.id === fatturaId) : null;
+  const ddtIds = f ? f.ddtIds : data.spedizioni.filter(s => s.clienteId === clienteId && !s.fatturaId).map(s => s.id);
+  if (ddtIds.length === 0) { toast('Nessun DDT da fatturare per questo cliente', 'error'); return; }
+  const calc = calcolaFattura(clienteId, ddtIds);
+  if (!calc.cliente) { toast('Cliente non valido', 'error'); return; }
+  const cfg = data.config.fatturazione;
+  const numero = f?.numero || generateFatturaNumero();
+  const dataDoc = f?.data || new Date().toISOString().slice(0, 10);
+
+  showModal({
+    title: f ? `Fattura ${numero}` : 'Anteprima fattura',
+    body: `
+      <div id="fatturaPreviewWrap">
+        <div class="print-label" style="max-width:none;border-color:var(--navy)">
+          <div class="print-label-header" style="text-align:left;display:flex;justify-content:space-between;align-items:center">
+            <span>FATTURA</span>
+            <span style="font-size:18px">${escapeHtml(numero)}</span>
+          </div>
+          <div class="print-label-amber-line"></div>
+          <div style="padding:16px 20px;font-family:'Inter',sans-serif;font-size:13px;line-height:1.6">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:18px">
+              <div>
+                <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Mittente</div>
+                <strong>${escapeHtml(data.config.azienda)}</strong><br>
+                ${escapeHtml(data.config.indirizzo)}<br>
+                ${data.config.piva ? 'P.IVA ' + escapeHtml(data.config.piva) : ''}
+                ${data.config.codiceFiscale ? '<br>C.F. ' + escapeHtml(data.config.codiceFiscale) : ''}
+              </div>
+              <div>
+                <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px">Destinatario</div>
+                <strong>${escapeHtml(calc.cliente.ragioneSociale)}</strong><br>
+                ${escapeHtml(calc.cliente.indirizzo || '')}<br>
+                ${calc.cliente.piva ? 'P.IVA ' + escapeHtml(calc.cliente.piva) : ''}
+                ${calc.cliente.pec ? '<br>PEC ' + escapeHtml(calc.cliente.pec) : ''}
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;padding:10px;background:var(--light-bg);border-radius:8px">
+              <div><div style="color:var(--muted);font-size:11px">Data documento</div><strong>${fmtDate(dataDoc)}</strong></div>
+              <div><div style="color:var(--muted);font-size:11px">Numero</div><strong class="mono">${escapeHtml(numero)}</strong></div>
+              <div><div style="color:var(--muted);font-size:11px">Regime fiscale</div><strong>${escapeHtml(cfg.regimeFiscale || 'RF01')}</strong></div>
+            </div>
+            <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px">
+              <thead>
+                <tr style="background:var(--navy);color:white">
+                  <th style="padding:8px;text-align:left">Descrizione</th>
+                  <th style="padding:8px;text-align:right">Q.tà</th>
+                  <th style="padding:8px;text-align:right">Prezzo</th>
+                  <th style="padding:8px;text-align:right">IVA</th>
+                  <th style="padding:8px;text-align:right">Imponibile</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${calc.righe.map(r => `
+                  <tr style="border-bottom:1px solid var(--grey-light)">
+                    <td style="padding:8px">${escapeHtml(r.prodottoNome)}<br><span style="color:var(--muted);font-size:11px">DDT ${escapeHtml(r.ddtNumero)} del ${fmtDate(r.ddtData)}${r.lottoCodice?' · Lotto '+escapeHtml(r.lottoCodice):''}</span></td>
+                    <td style="padding:8px;text-align:right">${r.quantita}</td>
+                    <td style="padding:8px;text-align:right">${fmtEur(r.prezzoUnitario)}</td>
+                    <td style="padding:8px;text-align:right">${r.aliquota}%</td>
+                    <td style="padding:8px;text-align:right">${fmtEur(r.imponibile)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div style="display:flex;justify-content:flex-end;margin-top:8px">
+              <div style="min-width:280px">
+                <div style="display:flex;justify-content:space-between;padding:4px 0"><span>Imponibile</span><strong>${fmtEur(calc.imponibile)}</strong></div>
+                <div style="display:flex;justify-content:space-between;padding:4px 0"><span>IVA</span><strong>${fmtEur(calc.iva)}</strong></div>
+                ${calc.bollo > 0 ? `<div style="display:flex;justify-content:space-between;padding:4px 0"><span>Bollo</span><strong>${fmtEur(calc.bollo)}</strong></div>` : ''}
+                <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:2px solid var(--navy);margin-top:6px;font-size:16px"><strong>TOTALE</strong><strong style="color:var(--navy)">${fmtEur(calc.totale)}</strong></div>
+              </div>
+            </div>
+            ${cfg.iban ? `<div style="margin-top:16px;padding:10px;background:var(--amber-bg);border-radius:6px;font-size:12px">Pagamento tramite bonifico bancario: <strong class="mono">${escapeHtml(cfg.iban)}</strong></div>` : ''}
+            ${cfg.regimeFiscale === 'RF19' ? `<div style="margin-top:10px;font-size:11px;color:var(--muted);font-style:italic">Operazione in franchigia IVA ex art. 1, c. 54-89 L. 190/2014 (regime forfettario).</div>` : ''}
+          </div>
+        </div>
+      </div>
+    `,
+    footer: f ? `
+      <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
+      <button class="btn btn--ghost" onclick="window.print()">🖨 Stampa</button>
+      <button class="btn btn--ghost" onclick="downloadFatturaPA('${f.id}')">📥 XML</button>
+      <button class="btn btn--amber" onclick="openEmailModal('${f.id}')">📧 Invia email</button>
+    ` : `
+      <button class="btn btn--ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn btn--amber" onclick='confermaFattura(${JSON.stringify({clienteId, ddtIds, numero, data: dataDoc}).replace(/'/g, "&#39;")})'>✅ Conferma e archivia</button>
+    `
+  });
+}
+
+function confermaFattura(args) {
+  const { clienteId, ddtIds, numero, data: dataDoc } = args;
+  const calc = calcolaFattura(clienteId, ddtIds);
+  const fattura = {
+    id: uid(),
+    numero,
+    data: dataDoc,
+    anno: parseInt(dataDoc.slice(0, 4)),
+    clienteId,
+    ddtIds: [...ddtIds],
+    righe: calc.righe,
+    imponibile: calc.imponibile,
+    iva: calc.iva,
+    bollo: calc.bollo,
+    totale: calc.totale,
+    pagata: false,
+    dataPagamento: null,
+    createdAt: new Date().toISOString(),
+  };
+  data.fatture.push(fattura);
+  ddtIds.forEach(id => {
+    const s = data.spedizioni.find(x => x.id === id);
+    if (s) s.fatturaId = fattura.id;
+  });
+  data.config.fatturazione.prossimoNumero = (data.config.fatturazione.prossimoNumero || 1) + 1;
+  saveData();
+  closeModal();
+  fatturazioneTab = 'emesse';
+  render();
+  toast(`Fattura ${numero} archiviata`);
+}
+
+function showFatturaPdf(id) {
+  const f = data.fatture.find(x => x.id === id);
+  if (!f) return;
+  openFatturaPreviewModal(f.clienteId, f.id);
+}
+
+function deleteFattura(id) {
+  const f = data.fatture.find(x => x.id === id);
+  if (!f) return;
+  if (!confirm(`Eliminare la fattura ${f.numero}? I DDT collegati torneranno disponibili per la fatturazione.`)) return;
+  (f.ddtIds || []).forEach(ddtId => {
+    const s = data.spedizioni.find(x => x.id === ddtId);
+    if (s && s.fatturaId === id) s.fatturaId = null;
+  });
+  data.fatture = data.fatture.filter(x => x.id !== id);
+  saveData();
+  render();
+  toast('Fattura eliminata', 'info');
+}
+
+function togglePagamento(id) {
+  const f = data.fatture.find(x => x.id === id);
+  if (!f) return;
+  if (f.pagata) {
+    if (!confirm(`Annullare lo stato "pagata" della fattura ${f.numero}?`)) return;
+    f.pagata = false;
+    f.dataPagamento = null;
+    saveData();
+    render();
+    toast('Pagamento annullato', 'info');
+  } else {
+    const oggi = new Date().toISOString().slice(0, 10);
+    const dataPag = prompt(`Data di pagamento per fattura ${f.numero}:`, oggi);
+    if (!dataPag) return;
+    f.pagata = true;
+    f.dataPagamento = dataPag;
+    saveData();
+    render();
+    toast(`Fattura ${f.numero} segnata come pagata`);
+  }
+}
+
+function generateFatturaPA(fattura) {
+  const cliente = data.clienti.find(c => c.id === fattura.clienteId);
+  const cfg = data.config.fatturazione;
+  const az = data.config;
+  const codDest = (cliente?.codiceDestinatario || cfg.codiceDestinatario || '0000000').padEnd(7, '0').slice(0, 7);
+  const pec = cliente?.pec || '';
+  const pivaCliente = (cliente?.piva || '').replace(/\D/g, '');
+  const cfCliente = cliente?.codiceFiscale || pivaCliente;
+  const pivaAz = (az.piva || '').replace(/\D/g, '');
+  const idTrasm = pivaAz || '00000000000';
+  const progressivo = (fattura.numero || '').replace(/[^0-9]/g, '').slice(0, 5).padStart(5, '0');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<p:FatturaElettronica versione="FPR12" xmlns:p="http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <FatturaElettronicaHeader>
+    <DatiTrasmissione>
+      <IdTrasmittente>
+        <IdPaese>IT</IdPaese>
+        <IdCodice>${escapeXml(idTrasm)}</IdCodice>
+      </IdTrasmittente>
+      <ProgressivoInvio>${escapeXml(progressivo)}</ProgressivoInvio>
+      <FormatoTrasmissione>FPR12</FormatoTrasmissione>
+      <CodiceDestinatario>${escapeXml(codDest)}</CodiceDestinatario>
+      ${pec ? `<PECDestinatario>${escapeXml(pec)}</PECDestinatario>` : ''}
+    </DatiTrasmissione>
+    <CedentePrestatore>
+      <DatiAnagrafici>
+        <IdFiscaleIVA>
+          <IdPaese>IT</IdPaese>
+          <IdCodice>${escapeXml(pivaAz)}</IdCodice>
+        </IdFiscaleIVA>
+        ${az.codiceFiscale ? `<CodiceFiscale>${escapeXml(az.codiceFiscale)}</CodiceFiscale>` : ''}
+        <Anagrafica><Denominazione>${escapeXml(az.azienda)}</Denominazione></Anagrafica>
+        <RegimeFiscale>${escapeXml(cfg.regimeFiscale || 'RF01')}</RegimeFiscale>
+      </DatiAnagrafici>
+      <Sede>
+        <Indirizzo>${escapeXml(az.indirizzo || '—')}</Indirizzo>
+        <CAP>00000</CAP>
+        <Comune>—</Comune>
+        <Nazione>IT</Nazione>
+      </Sede>
+    </CedentePrestatore>
+    <CessionarioCommittente>
+      <DatiAnagrafici>
+        ${pivaCliente ? `<IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice>${escapeXml(pivaCliente)}</IdCodice></IdFiscaleIVA>` : ''}
+        ${cfCliente ? `<CodiceFiscale>${escapeXml(cfCliente)}</CodiceFiscale>` : ''}
+        <Anagrafica><Denominazione>${escapeXml(cliente?.ragioneSociale || '—')}</Denominazione></Anagrafica>
+      </DatiAnagrafici>
+      <Sede>
+        <Indirizzo>${escapeXml(cliente?.indirizzo || '—')}</Indirizzo>
+        <CAP>00000</CAP>
+        <Comune>—</Comune>
+        <Nazione>IT</Nazione>
+      </Sede>
+    </CessionarioCommittente>
+  </FatturaElettronicaHeader>
+  <FatturaElettronicaBody>
+    <DatiGenerali>
+      <DatiGeneraliDocumento>
+        <TipoDocumento>TD01</TipoDocumento>
+        <Divisa>EUR</Divisa>
+        <Data>${escapeXml(fattura.data)}</Data>
+        <Numero>${escapeXml(fattura.numero)}</Numero>
+        ${fattura.bollo > 0 ? `<DatiBollo><BolloVirtuale>SI</BolloVirtuale><ImportoBollo>${fattura.bollo.toFixed(2)}</ImportoBollo></DatiBollo>` : ''}
+        <ImportoTotaleDocumento>${(fattura.totale || 0).toFixed(2)}</ImportoTotaleDocumento>
+      </DatiGeneraliDocumento>
+${(fattura.righe || []).filter(r => r.ddtNumero).map(r => `      <DatiDDT>
+        <NumeroDDT>${escapeXml(r.ddtNumero)}</NumeroDDT>
+        <DataDDT>${escapeXml(r.ddtData)}</DataDDT>
+      </DatiDDT>`).join('\n')}
+    </DatiGenerali>
+    <DatiBeniServizi>
+${(fattura.righe || []).map((r, i) => `      <DettaglioLinee>
+        <NumeroLinea>${i + 1}</NumeroLinea>
+        <Descrizione>${escapeXml(r.prodottoNome + (r.lottoCodice ? ' - Lotto ' + r.lottoCodice : ''))}</Descrizione>
+        <Quantita>${(r.quantita || 0).toFixed(2)}</Quantita>
+        <PrezzoUnitario>${(r.prezzoUnitario || 0).toFixed(4)}</PrezzoUnitario>
+        <PrezzoTotale>${(r.imponibile || 0).toFixed(2)}</PrezzoTotale>
+        <AliquotaIVA>${(r.aliquota || 0).toFixed(2)}</AliquotaIVA>
+      </DettaglioLinee>`).join('\n')}
+${aggregaIVAPerAliquota(fattura.righe).map(g => `      <DatiRiepilogo>
+        <AliquotaIVA>${g.aliquota.toFixed(2)}</AliquotaIVA>
+        <ImponibileImporto>${g.imponibile.toFixed(2)}</ImponibileImporto>
+        <Imposta>${g.iva.toFixed(2)}</Imposta>
+        <EsigibilitaIVA>I</EsigibilitaIVA>
+      </DatiRiepilogo>`).join('\n')}
+    </DatiBeniServizi>
+  </FatturaElettronicaBody>
+</p:FatturaElettronica>`;
+  return xml;
+}
+
+function aggregaIVAPerAliquota(righe) {
+  const map = {};
+  (righe || []).forEach(r => {
+    const a = r.aliquota || 0;
+    if (!map[a]) map[a] = { aliquota: a, imponibile: 0, iva: 0 };
+    map[a].imponibile += r.imponibile || 0;
+    map[a].iva += r.iva || 0;
+  });
+  return Object.values(map).map(g => ({ aliquota: g.aliquota, imponibile: round2(g.imponibile), iva: round2(g.iva) }));
+}
+
+function downloadFatturaPA(id) {
+  const f = data.fatture.find(x => x.id === id);
+  if (!f) return;
+  if (!data.config.piva) { toast('Compila la P.IVA in Impostazioni prima di generare l\'XML', 'error'); return; }
+  const xml = generateFatturaPA(f);
+  const pivaAz = (data.config.piva || '').replace(/\D/g, '').padStart(11, '0');
+  const progressivo = (f.numero || '').replace(/[^0-9]/g, '').slice(0, 5).padStart(5, '0');
+  const filename = `IT${pivaAz}_${progressivo}.xml`;
+  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  toast(`XML FatturaPA scaricato: ${filename}`);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   EMAIL (EmailJS)
+   ════════════════════════════════════════════════════════════════════ */
+let emailjsLoaded = false;
+
+function loadEmailJS() {
+  return new Promise((resolve, reject) => {
+    if (emailjsLoaded && window.emailjs) return resolve();
+    if (document.getElementById('emailjs-script')) {
+      const wait = () => window.emailjs ? resolve() : setTimeout(wait, 100);
+      wait();
+      return;
+    }
+    const s = document.createElement('script');
+    s.id = 'emailjs-script';
+    s.src = 'https://cdn.emailjs.com/dist/email.min.js';
+    s.onload = () => {
+      try {
+        window.emailjs.init(data.config.emailjs.publicKey);
+        emailjsLoaded = true;
+        resolve();
+      } catch(e) { reject(e); }
+    };
+    s.onerror = () => reject(new Error('Caricamento EmailJS fallito'));
+    document.head.appendChild(s);
+  });
+}
+
+function openEmailModal(fatturaId) {
+  const f = data.fatture.find(x => x.id === fatturaId);
+  if (!f) return;
+  const cliente = data.clienti.find(c => c.id === f.clienteId);
+  const cfg = data.config.emailjs;
+  const setup = cfg.serviceId && cfg.templateId && cfg.publicKey;
+
+  showModal({
+    title: `Invia fattura ${f.numero} via email`,
+    body: `
+      ${!setup ? `
+        <div class="banner">
+          <div class="banner-icon">!</div>
+          <div class="banner-content">
+            <div class="banner-title">EmailJS non configurato</div>
+            <div>Per inviare email automaticamente devi configurare EmailJS in <a href="#" onclick="closeModal();navigateTo('dati');return false;" style="color:var(--navy);font-weight:600">Impostazioni</a>. Puoi comunque usare il pulsante "Apri in app email" qui sotto.</div>
+          </div>
+        </div>
+      ` : ''}
+      <form id="emailForm">
+        <div class="form-grid">
+          <div class="field field--full">
+            <label class="field-label">Destinatari (TO) — separa con virgola o invio</label>
+            <input type="text" class="field-input" name="to" value="${escapeHtml(cliente?.email || '')}" placeholder="cliente@email.com, altro@email.com" required>
+          </div>
+          <div class="field field--full">
+            <label class="field-label">In copia (CC) — opzionale</label>
+            <input type="text" class="field-input" name="cc" value="" placeholder="commercialista@studio.it">
+          </div>
+          <div class="field field--full">
+            <label class="field-label">Oggetto</label>
+            <input type="text" class="field-input" name="oggetto" value="Fattura ${escapeHtml(f.numero)} - ${escapeHtml(data.config.azienda)}" required>
+          </div>
+          <div class="field field--full">
+            <label class="field-label">Messaggio</label>
+            <textarea class="field-textarea" name="messaggio" style="min-height:140px" required>Buongiorno,
+
+in allegato la fattura ${f.numero} del ${fmtDate(f.data)} per un totale di ${fmtEur(f.totale)}.
+
+Cordiali saluti,
+${data.config.azienda}</textarea>
+          </div>
+        </div>
+      </form>
+    `,
+    footer: `
+      <button class="btn btn--ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn btn--ghost" onclick="apriMailto('${f.id}')">✉ Apri in app email</button>
+      <button class="btn btn--amber" onclick="inviaEmailFattura('${f.id}')" ${!setup?'disabled':''}>📧 Invia con EmailJS</button>
+    `
+  });
+}
+
+function parseEmails(s) {
+  return (s || '').split(/[,;\n]/).map(x => x.trim()).filter(Boolean);
+}
+
+function apriMailto(fatturaId) {
+  const form = document.getElementById('emailForm');
+  const fd = new FormData(form);
+  const to = parseEmails(fd.get('to')).join(',');
+  const cc = parseEmails(fd.get('cc')).join(',');
+  const subject = encodeURIComponent(fd.get('oggetto'));
+  const body = encodeURIComponent(fd.get('messaggio') + '\n\n[Allega manualmente il PDF/XML della fattura]');
+  const ccPart = cc ? `&cc=${cc}` : '';
+  window.location.href = `mailto:${to}?subject=${subject}${ccPart}&body=${body}`;
+  toast('Apro la tua app email. Allega manualmente PDF/XML.', 'info', 5000);
+}
+
+async function inviaEmailFattura(fatturaId) {
+  const f = data.fatture.find(x => x.id === fatturaId);
+  if (!f) return;
+  const cfg = data.config.emailjs;
+  if (!cfg.serviceId || !cfg.templateId || !cfg.publicKey) {
+    toast('Configura EmailJS in Impostazioni', 'error');
+    return;
+  }
+  const form = document.getElementById('emailForm');
+  const fd = new FormData(form);
+  const to = parseEmails(fd.get('to'));
+  const cc = parseEmails(fd.get('cc'));
+  if (to.length === 0) { toast('Inserisci almeno un destinatario', 'error'); return; }
+
+  const confirmMsg = `Confermi l'invio della fattura ${f.numero}?\n\nDestinatari: ${to.join(', ')}` + (cc.length ? `\nIn copia: ${cc.join(', ')}` : '');
+  if (!confirm(confirmMsg)) return;
+
+  try {
+    await loadEmailJS();
+    const params = {
+      to_email: to.join(', '),
+      cc_email: cc.join(', '),
+      subject: fd.get('oggetto'),
+      message: fd.get('messaggio'),
+      numero_fattura: f.numero,
+      totale: fmtEur(f.totale),
+      mittente: data.config.azienda,
+    };
+    await window.emailjs.send(cfg.serviceId, cfg.templateId, params, cfg.publicKey);
+    data.emailLog.push({
+      id: uid(),
+      data: new Date().toISOString(),
+      fatturaId: f.id,
+      destinatari: [...to, ...cc.map(c => '(cc) ' + c)],
+      esito: 'inviata',
+    });
+    saveData();
+    closeModal();
+    toast(`Email inviata a ${to.length} destinatari`, 'success', 4000);
+  } catch(e) {
+    console.error(e);
+    toast('Errore invio email: ' + (e?.text || e?.message || 'sconosciuto'), 'error', 6000);
+    data.emailLog.push({
+      id: uid(),
+      data: new Date().toISOString(),
+      fatturaId: f.id,
+      destinatari: [...to, ...cc.map(c => '(cc) ' + c)],
+      esito: 'errore: ' + (e?.text || e?.message || 'sconosciuto'),
+    });
+    saveData();
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PAGE: CLIENTE DETTAGLIO
+   ════════════════════════════════════════════════════════════════════ */
+let clienteTab = 'fatture';
+
+function renderClienteDettaglio(clienteId) {
+  const c = data.clienti.find(x => x.id === clienteId);
+  if (!c) {
+    return `
+      <div class="card empty">
+        <div class="empty-icon">⚠</div>
+        <div class="empty-title">Cliente non trovato</div>
+        <button class="btn btn--ghost" onclick="navigateTo('clienti')">← Torna ai clienti</button>
+      </div>
+    `;
+  }
+
+  const ddtCliente = data.spedizioni.filter(s => s.clienteId === clienteId);
+  const fattureCliente = data.fatture.filter(f => f.clienteId === clienteId);
+  const ordiniCliente = data.ordini.filter(o => o.clienteId === clienteId);
+  const annoCorr = new Date().getFullYear();
+  const fatturatoAnno = fattureCliente.filter(f => f.anno === annoCorr).reduce((s,f) => s + (f.totale || 0), 0);
+  const insoluti = fattureCliente.filter(f => !f.pagata).reduce((s,f) => s + (f.totale || 0), 0);
+  const ultimaSped = ddtCliente.length > 0 ? ddtCliente.sort((a,b)=> (b.data||'').localeCompare(a.data||''))[0].data : null;
+
+  return `
+    <div class="page-header">
+      <div>
+        <button class="btn btn--ghost btn--small" onclick="navigateTo('clienti')">← Torna ai clienti</button>
+        <div class="page-title" style="margin-top:10px">${escapeHtml(c.ragioneSociale)}</div>
+        <div class="page-subtitle">
+          ${escapeHtml(c.indirizzo || '—')}
+          ${c.piva ? ' · P.IVA ' + escapeHtml(c.piva) : ''}
+          ${c.telefono ? ' · tel ' + escapeHtml(c.telefono) : ''}
+          ${c.email ? ' · ' + escapeHtml(c.email) : ''}
+        </div>
+      </div>
+      <button class="btn btn--ghost" onclick="openClienteModal('${c.id}')">Modifica anagrafica</button>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Fatturato ${annoCorr}</div><div class="kpi-value">${fmtEur(fatturatoAnno)}</div></div>
+      <div class="kpi kpi--blue"><div class="kpi-label">DDT totali</div><div class="kpi-value">${ddtCliente.length}</div><div class="kpi-detail">${fattureCliente.length} fatture</div></div>
+      <div class="kpi ${insoluti > 0 ? 'kpi--red' : 'kpi--green'}"><div class="kpi-label">Insoluti</div><div class="kpi-value">${fmtEur(insoluti)}</div></div>
+      <div class="kpi"><div class="kpi-label">Ultima spedizione</div><div class="kpi-value" style="font-size:22px">${ultimaSped ? fmtDate(ultimaSped) : '—'}</div></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--grey-bord);flex-wrap:wrap">
+      <button class="btn ${clienteTab==='ordini'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="clienteTab='ordini';render()">📋 Ordini (${ordiniCliente.length})</button>
+      <button class="btn ${clienteTab==='ddt'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="clienteTab='ddt';render()">🚚 DDT (${ddtCliente.length})</button>
+      <button class="btn ${clienteTab==='fatture'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="clienteTab='fatture';render()">🧾 Fatture (${fattureCliente.length})</button>
+      <button class="btn ${clienteTab==='listino'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="clienteTab='listino';render()">💰 Listino</button>
+    </div>
+
+    ${clienteTab === 'ordini' ? renderTabOrdiniCliente(ordiniCliente)
+      : clienteTab === 'ddt' ? renderTabDdtCliente(ddtCliente)
+      : clienteTab === 'fatture' ? renderTabFattureCliente(fattureCliente)
+      : renderTabListinoCliente(c)}
+  `;
+}
+
+function renderTabOrdiniCliente(ordini) {
+  if (ordini.length === 0) return `<div class="card empty"><div class="empty-icon">📋</div><div class="empty-title">Nessun ordine</div></div>`;
+  const sorted = [...ordini].sort((a,b) => (b.data||'').localeCompare(a.data||''));
+  return `
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Numero</th><th>Data</th><th>Consegna</th><th>Righe</th><th>Totale</th><th>Stato</th></tr></thead>
+        <tbody>
+          ${sorted.map(o => {
+            const totale = (o.righe || []).reduce((s,r) => s + (parseFloat(r.prezzo)||0) * (parseInt(r.quantita)||0), 0);
+            return `
+              <tr style="cursor:pointer" onclick="openOrdineModal('${o.id}')">
+                <td class="mono"><strong>${escapeHtml(o.numero)}</strong></td>
+                <td>${fmtDate(o.data)}</td>
+                <td>${o.dataConsegna ? fmtDate(o.dataConsegna) : '—'}${o.oraConsegna?' '+o.oraConsegna:''}</td>
+                <td>${(o.righe||[]).length}</td>
+                <td><strong>${fmtEur(totale)}</strong></td>
+                <td>${statoOrdinePill(o.stato)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTabDdtCliente(ddt) {
+  if (ddt.length === 0) return `<div class="card empty"><div class="empty-icon">🚚</div><div class="empty-title">Nessun DDT</div></div>`;
+  const sorted = [...ddt].sort((a,b) => (b.data||'').localeCompare(a.data||''));
+  return `
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>DDT</th><th>Data</th><th>Lotto</th><th>Q.tà</th><th>Importo</th><th>Stato</th></tr></thead>
+        <tbody>
+          ${sorted.map(s => {
+            const lotto = data.lotti.find(l => l.id === s.lottoId);
+            const prezzo = Number(s.prezzoUnitario) || 0;
+            const importo = prezzo * (Number(s.quantita) || 0);
+            return `
+              <tr>
+                <td class="mono"><strong>${escapeHtml(s.ddt || '—')}</strong></td>
+                <td>${fmtDate(s.data)}</td>
+                <td class="mono">${escapeHtml(lotto?.codice || '—')}</td>
+                <td>${s.quantita} pz</td>
+                <td>${importo > 0 ? fmtEur(importo) : '—'}</td>
+                <td>${s.fatturaId ? '<span class="pill pill--green">Fatturato</span>' : '<span class="pill pill--amber">Da fatturare</span>'}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTabFattureCliente(fatture) {
+  if (fatture.length === 0) return `<div class="card empty"><div class="empty-icon">🧾</div><div class="empty-title">Nessuna fattura</div></div>`;
+  const sorted = [...fatture].sort((a,b) => (b.numero || '').localeCompare(a.numero || ''));
+  return `
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Numero</th><th>Data</th><th>Imponibile</th><th>IVA</th><th>Totale</th><th>Stato</th><th></th></tr></thead>
+        <tbody>
+          ${sorted.map(f => `
+            <tr>
+              <td class="mono"><strong>${escapeHtml(f.numero)}</strong></td>
+              <td>${fmtDate(f.data)}</td>
+              <td>${fmtEur(f.imponibile || 0)}</td>
+              <td>${fmtEur(f.iva || 0)}</td>
+              <td><strong>${fmtEur(f.totale || 0)}</strong></td>
+              <td>${f.pagata ? `<span class="pill pill--green">✓ Pagata${f.dataPagamento?' '+fmtDate(f.dataPagamento):''}</span>` : '<span class="pill pill--red">Da pagare</span>'}</td>
+              <td>
+                <div class="table-actions">
+                  <button class="btn btn--ghost btn--small" onclick="showFatturaPdf('${f.id}')">🖨</button>
+                  <button class="btn btn--ghost btn--small" onclick="togglePagamento('${f.id}')">${f.pagata?'Annulla':'Paga'}</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderTabListinoCliente(cliente) {
+  cliente.listino = cliente.listino || [];
+  return `
+    <div class="banner banner--info">
+      <div class="banner-icon">i</div>
+      <div class="banner-content">
+        <div class="banner-title">Prezzi personalizzati per questo cliente</div>
+        <div>Per ogni prodotto puoi impostare scaglioni quantità diversi dal prezzo default. Se non personalizzi, viene usato il prezzo default del prodotto.</div>
+      </div>
+    </div>
+
+    <div style="display:grid;gap:14px">
+      ${data.prodotti.map(p => {
+        const voce = cliente.listino.find(v => v.prodottoId === p.id);
+        const hasOverride = voce && voce.scaglioni && voce.scaglioni.length > 0;
+        return `
+          <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+              <div>
+                <strong style="font-family:'Fraunces',serif;font-size:17px;color:var(--navy)">${escapeHtml(p.nome)}</strong>
+                <span style="color:var(--muted);font-size:12px;margin-left:8px">(${escapeHtml(p.codice)})</span>
+                <div style="color:var(--muted);font-size:13px;margin-top:2px">Default prodotto: <strong>${fmtEur(p.prezzoDefault || 0)}</strong></div>
+              </div>
+              ${!hasOverride ? `<button class="btn btn--ghost btn--small" onclick="aggiungiScaglione('${cliente.id}','${p.id}')">+ Personalizza per questo cliente</button>` : ''}
+            </div>
+            ${hasOverride ? `
+              <div style="margin-top:14px;display:grid;gap:8px">
+                ${voce.scaglioni.sort((a,b)=>(a.minQta||0)-(b.minQta||0)).map((s, idx) => `
+                  <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:center;padding:8px 12px;background:var(--light-bg);border-radius:6px">
+                    <div>
+                      <label style="font-size:11px;color:var(--muted)">Da quantità (≥)</label>
+                      <input type="number" class="field-input" value="${s.minQta}" min="0" onchange="aggiornaScaglione('${cliente.id}','${p.id}',${idx},'minQta',this.value)">
+                    </div>
+                    <div>
+                      <label style="font-size:11px;color:var(--muted)">Prezzo (€/pz)</label>
+                      <input type="number" class="field-input" value="${s.prezzo}" min="0" step="0.01" onchange="aggiornaScaglione('${cliente.id}','${p.id}',${idx},'prezzo',this.value)">
+                    </div>
+                    <button class="btn btn--danger btn--small" onclick="rimuoviScaglione('${cliente.id}','${p.id}',${idx})">×</button>
+                  </div>
+                `).join('')}
+                <button class="btn btn--ghost btn--small" style="justify-self:flex-start" onclick="aggiungiScaglione('${cliente.id}','${p.id}')">+ Aggiungi scaglione</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function aggiungiScaglione(clienteId, prodottoId) {
+  const c = data.clienti.find(x => x.id === clienteId);
+  if (!c) return;
+  c.listino = c.listino || [];
+  let v = c.listino.find(x => x.prodottoId === prodottoId);
+  if (!v) {
+    v = { prodottoId, scaglioni: [] };
+    c.listino.push(v);
+  }
+  const ultimo = v.scaglioni[v.scaglioni.length - 1];
+  const nextMin = ultimo ? (ultimo.minQta || 0) + 100 : 1;
+  const p = data.prodotti.find(x => x.id === prodottoId);
+  v.scaglioni.push({ minQta: nextMin, prezzo: p?.prezzoDefault || 0 });
+  saveData();
+  render();
+}
+
+function aggiornaScaglione(clienteId, prodottoId, idx, campo, valore) {
+  const c = data.clienti.find(x => x.id === clienteId);
+  if (!c) return;
+  const v = c.listino.find(x => x.prodottoId === prodottoId);
+  if (!v) return;
+  const sortati = v.scaglioni.slice().sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+  const target = sortati[idx];
+  if (!target) return;
+  const realIdx = v.scaglioni.indexOf(target);
+  v.scaglioni[realIdx][campo] = parseFloat(valore) || 0;
+  saveData();
+  toast('Scaglione aggiornato');
+}
+
+function rimuoviScaglione(clienteId, prodottoId, idx) {
+  const c = data.clienti.find(x => x.id === clienteId);
+  if (!c) return;
+  const v = c.listino.find(x => x.prodottoId === prodottoId);
+  if (!v) return;
+  const sortati = v.scaglioni.slice().sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+  const target = sortati[idx];
+  if (!target) return;
+  v.scaglioni = v.scaglioni.filter(s => s !== target);
+  if (v.scaglioni.length === 0) c.listino = c.listino.filter(x => x !== v);
+  saveData();
+  render();
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -2549,7 +4062,7 @@ function renderDati() {
     <div class="two-col">
       <div class="card">
         <div class="card-h">🏢 Dati aziendali</div>
-        <p style="color:var(--muted);margin-bottom:16px;font-size:14px">Appaiono sulle etichette dei cartoni e nei documenti.</p>
+        <p style="color:var(--muted);margin-bottom:16px;font-size:14px">Appaiono sulle etichette dei cartoni, nelle fatture e nel file XML FatturaPA.</p>
         <form id="cfgForm">
           <div class="form-grid">
             <div class="field field--full">
@@ -2560,9 +4073,13 @@ function renderDati() {
               <label class="field-label">Indirizzo</label>
               <input type="text" class="field-input" name="indirizzo" value="${escapeHtml(data.config.indirizzo)}" required>
             </div>
-            <div class="field field--full">
+            <div class="field">
               <label class="field-label">P. IVA</label>
               <input type="text" class="field-input mono" name="piva" value="${escapeHtml(data.config.piva)}">
+            </div>
+            <div class="field">
+              <label class="field-label">Codice fiscale</label>
+              <input type="text" class="field-input mono" name="codiceFiscale" value="${escapeHtml(data.config.codiceFiscale || '')}">
             </div>
             <div class="field field--full">
               <label class="field-label">Operatore predefinito</label>
@@ -2594,6 +4111,86 @@ function renderDati() {
       </div>
     </div>
 
+    <div class="two-col" style="margin-top:24px">
+      <div class="card">
+        <div class="card-h">🧾 Dati fiscali e fatturazione</div>
+        <p style="color:var(--muted);margin-bottom:16px;font-size:14px">Usati per generare fatture e file XML FatturaPA.</p>
+        <form id="fiscForm">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label">Regime fiscale</label>
+              <select class="field-select" name="regimeFiscale">
+                <option value="RF01" ${data.config.fatturazione.regimeFiscale==='RF01'?'selected':''}>RF01 - Ordinario</option>
+                <option value="RF19" ${data.config.fatturazione.regimeFiscale==='RF19'?'selected':''}>RF19 - Forfettario</option>
+                <option value="RF02" ${data.config.fatturazione.regimeFiscale==='RF02'?'selected':''}>RF02 - Contribuenti minimi</option>
+                <option value="RF04" ${data.config.fatturazione.regimeFiscale==='RF04'?'selected':''}>RF04 - Agricoltura</option>
+              </select>
+            </div>
+            <div class="field">
+              <label class="field-label">IVA default (%)</label>
+              <input type="number" class="field-input" name="ivaDefault" value="${data.config.fatturazione.ivaDefault}" min="0" max="50">
+            </div>
+            <div class="field">
+              <label class="field-label">Prefisso numero fattura</label>
+              <input type="text" class="field-input mono" name="prefissoFattura" value="${escapeHtml(data.config.fatturazione.prefissoFattura)}" maxlength="5">
+            </div>
+            <div class="field">
+              <label class="field-label">Prossimo numero</label>
+              <input type="number" class="field-input mono" name="prossimoNumero" value="${data.config.fatturazione.prossimoNumero}" min="1">
+            </div>
+            <div class="field field--full">
+              <label class="field-label">IBAN per bonifici</label>
+              <input type="text" class="field-input mono" name="iban" value="${escapeHtml(data.config.fatturazione.iban)}" placeholder="IT00 X000 0000 0000 0000 0000 000">
+            </div>
+            <div class="field">
+              <label class="field-label">PEC azienda</label>
+              <input type="email" class="field-input" name="pec" value="${escapeHtml(data.config.fatturazione.pec)}">
+            </div>
+            <div class="field">
+              <label class="field-label">Codice destinatario default</label>
+              <input type="text" class="field-input mono" name="codiceDestinatario" value="${escapeHtml(data.config.fatturazione.codiceDestinatario)}" maxlength="7">
+              <div class="field-help">7 caratteri (0000000 se sconosciuto)</div>
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <button type="button" class="btn btn--amber" onclick="saveFiscale()">Salva dati fiscali</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="card-h">📧 EmailJS — invio automatico</div>
+        <p style="color:var(--muted);margin-bottom:16px;font-size:14px">Per inviare le fatture via email senza aprire il client. Crea un account gratuito su emailjs.com.</p>
+        <form id="emjForm">
+          <div class="form-grid">
+            <div class="field field--full">
+              <label class="field-label">Service ID</label>
+              <input type="text" class="field-input mono" name="serviceId" value="${escapeHtml(data.config.emailjs.serviceId)}" placeholder="service_xxxxxxx">
+            </div>
+            <div class="field field--full">
+              <label class="field-label">Template ID</label>
+              <input type="text" class="field-input mono" name="templateId" value="${escapeHtml(data.config.emailjs.templateId)}" placeholder="template_xxxxxxx">
+            </div>
+            <div class="field field--full">
+              <label class="field-label">Public Key</label>
+              <input type="text" class="field-input mono" name="publicKey" value="${escapeHtml(data.config.emailjs.publicKey)}">
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn--amber" onclick="saveEmailJS()">Salva</button>
+            <button type="button" class="btn btn--ghost" onclick="testEmailJS()">📧 Email di test</button>
+          </div>
+        </form>
+        <div style="margin-top:16px;padding:12px;background:var(--light-bg);border-radius:8px;font-size:12px;line-height:1.6;color:var(--muted)">
+          <strong>Come configurare:</strong><br>
+          1. Vai su <a href="https://www.emailjs.com" target="_blank" style="color:var(--navy);font-weight:600">emailjs.com</a> e registrati (gratis 200 email/mese)<br>
+          2. Aggiungi un servizio email (Gmail, Outlook, ecc.)<br>
+          3. Crea un template con variabili: {{to_email}}, {{subject}}, {{message}}, {{numero_fattura}}, {{totale}}, {{mittente}}<br>
+          4. Copia qui Service ID, Template ID e Public Key
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="margin-top:24px">
       <div class="card-h">📊 Statistiche</div>
       <div class="kpi-grid" style="margin-bottom:0">
@@ -2602,6 +4199,8 @@ function renderDati() {
         <div><div class="kpi-label">Clienti</div><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:'Fraunces',serif">${data.clienti.length}</div></div>
         <div><div class="kpi-label">Lotti</div><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:'Fraunces',serif">${data.lotti.length}</div></div>
         <div><div class="kpi-label">Spedizioni</div><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:'Fraunces',serif">${data.spedizioni.length}</div></div>
+        <div><div class="kpi-label">Ordini</div><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:'Fraunces',serif">${data.ordini.length}</div></div>
+        <div><div class="kpi-label">Fatture</div><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:'Fraunces',serif">${data.fatture.length}</div></div>
         <div><div class="kpi-label">Controlli HACCP</div><div style="font-size:26px;font-weight:700;color:var(--navy);font-family:'Fraunces',serif">${data.haccp.length}</div></div>
       </div>
     </div>
@@ -2620,9 +4219,61 @@ function saveConfig() {
   data.config.azienda = fd.get('azienda');
   data.config.indirizzo = fd.get('indirizzo');
   data.config.piva = fd.get('piva');
+  data.config.codiceFiscale = fd.get('codiceFiscale');
   data.config.operatoreCorrente = fd.get('operatoreCorrente');
   saveData();
   toast('Dati aziendali salvati');
+}
+
+function saveFiscale() {
+  const form = document.getElementById('fiscForm');
+  const fd = new FormData(form);
+  const f = data.config.fatturazione;
+  f.regimeFiscale = fd.get('regimeFiscale');
+  f.ivaDefault = parseInt(fd.get('ivaDefault')) || 10;
+  f.prefissoFattura = (fd.get('prefissoFattura') || 'FT').toUpperCase();
+  f.prossimoNumero = parseInt(fd.get('prossimoNumero')) || 1;
+  f.iban = fd.get('iban');
+  f.pec = fd.get('pec');
+  f.codiceDestinatario = fd.get('codiceDestinatario') || '0000000';
+  saveData();
+  toast('Dati fiscali salvati');
+}
+
+function saveEmailJS() {
+  const form = document.getElementById('emjForm');
+  const fd = new FormData(form);
+  data.config.emailjs.serviceId = fd.get('serviceId').trim();
+  data.config.emailjs.templateId = fd.get('templateId').trim();
+  data.config.emailjs.publicKey = fd.get('publicKey').trim();
+  emailjsLoaded = false;
+  saveData();
+  toast('Configurazione EmailJS salvata');
+}
+
+async function testEmailJS() {
+  const cfg = data.config.emailjs;
+  if (!cfg.serviceId || !cfg.templateId || !cfg.publicKey) {
+    toast('Compila prima i 3 campi EmailJS e salva', 'error');
+    return;
+  }
+  const to = prompt('Indirizzo email di destinazione per il test:', '');
+  if (!to) return;
+  try {
+    await loadEmailJS();
+    await window.emailjs.send(cfg.serviceId, cfg.templateId, {
+      to_email: to,
+      cc_email: '',
+      subject: 'Test Brioche Lab Pro',
+      message: 'Questa è una email di test inviata da Brioche Lab Pro. Se la ricevi, la configurazione è corretta!',
+      numero_fattura: 'TEST',
+      totale: '€ 0,00',
+      mittente: data.config.azienda,
+    }, cfg.publicKey);
+    toast('Email di test inviata!', 'success', 4000);
+  } catch(e) {
+    toast('Errore: ' + (e?.text || e?.message || 'sconosciuto'), 'error', 6000);
+  }
 }
 
 function exportData() {
