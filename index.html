@@ -2574,7 +2574,7 @@ function deleteSped(id) {
 /* ════════════════════════════════════════════════════════════════════
    PAGE: ORDINI
    ════════════════════════════════════════════════════════════════════ */
-let ordiniFilter = { search: '', clienteId: '', stato: '' };
+let ordiniFilter = { search: '', clienteId: '', stato: '', giorno: '' };
 let ordiniTab = 'oggi';
 
 function totaleOrdine(o) {
@@ -2747,8 +2747,7 @@ function clienteCardHTML(cliente, ordiniOggi, variante) {
   `;
 }
 
-function renderOrdiniTabella() {
-  let ordini = [...data.ordini];
+function applicaFiltriOrdini(ordini) {
   if (ordiniFilter.search) {
     const q = ordiniFilter.search.toLowerCase();
     ordini = ordini.filter(o => {
@@ -2760,11 +2759,83 @@ function renderOrdiniTabella() {
   }
   if (ordiniFilter.clienteId) ordini = ordini.filter(o => o.clienteId === ordiniFilter.clienteId);
   if (ordiniFilter.stato) ordini = ordini.filter(o => o.stato === ordiniFilter.stato);
-  ordini.sort((a,b) => (b.dataConsegna || b.data || '').localeCompare(a.dataConsegna || a.data || ''));
+  return ordini;
+}
 
-  const oggi = new Date().toISOString().slice(0,10);
+function righeOrdineTabellaHTML(ordini, mostraData) {
+  const oggi = new Date().toISOString().slice(0, 10);
+  return ordini.map(o => {
+    const cliente = data.clienti.find(c => c.id === o.clienteId);
+    const totale = totaleOrdine(o);
+    const consegnaOggi = o.dataConsegna === oggi;
+    const inRitardo = o.dataConsegna && o.dataConsegna < oggi && o.stato === 'programmato';
+    return `
+      <tr style="cursor:pointer" onclick="if(!event.target.closest('button'))openOrdineModal('${o.id}')">
+        <td class="mono"><strong>${escapeHtml(o.numero || '—')}</strong></td>
+        <td>${escapeHtml(cliente?.ragioneSociale || '— eliminato —')}</td>
+        ${mostraData ? `
+          <td>
+            ${o.dataConsegna ? `<strong style="color:${inRitardo?'var(--red)':consegnaOggi?'var(--amber-dark)':'inherit'}">${fmtDate(o.dataConsegna)}</strong>` : '—'}
+            ${o.oraConsegna ? `<span style="color:var(--muted);font-size:12px"> · ${o.oraConsegna}</span>` : ''}
+          </td>
+        ` : `
+          <td>${o.oraConsegna ? `<strong>${escapeHtml(o.oraConsegna)}</strong>` : '<span style="color:var(--muted)">—</span>'}</td>
+        `}
+        <td>${(o.righe || []).length}</td>
+        <td><strong>${fmtEur(totale)}</strong></td>
+        <td>${statoOrdinePill(o.stato)}</td>
+        <td>
+          <div class="table-actions">
+            ${o.stato === 'programmato' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();segnaConsegnato('${o.id}')" title="Segna consegnato">✓</button>` : ''}
+            <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openOrdineModal('${o.id}')">Mod.</button>
+            <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteOrdine('${o.id}')">×</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
 
+function sezioneOrdiniHTML(titolo, ordini, opts) {
+  opts = opts || {};
+  const mostraData = !!opts.mostraData;
+  const klassExtra = opts.klass || '';
+  const colonnaData = mostraData ? '<th>Data consegna</th>' : '<th>Ora</th>';
   return `
+    <div class="cliente-sezione ${klassExtra}" style="margin-bottom:22px">
+      <div class="cliente-sezione-h">
+        ${titolo} <span class="badge">${ordini.length}</span>
+      </div>
+      ${ordini.length === 0 ? `
+        <div style="padding:14px;color:var(--muted);font-style:italic;font-size:13px">Nessun ordine programmato per questo giorno.</div>
+      ` : `
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Numero</th>
+                <th>Cliente</th>
+                ${colonnaData}
+                <th>Righe</th>
+                <th>Totale</th>
+                <th>Stato</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>${righeOrdineTabellaHTML(ordini, mostraData)}</tbody>
+          </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderOrdiniTabella() {
+  const oggi = new Date().toISOString().slice(0, 10);
+  const domani = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const dopodomani = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+
+  const filtri = `
     <div class="card" style="margin-bottom:20px">
       <div class="form-grid">
         <div class="field">
@@ -2786,64 +2857,57 @@ function renderOrdiniTabella() {
             ${ORDINE_STATI.map(s => `<option value="${s.value}" ${ordiniFilter.stato===s.value?'selected':''}>${s.label}</option>`).join('')}
           </select>
         </div>
+        <div class="field">
+          <label class="field-label">Vai a un giorno specifico</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="date" class="field-input" value="${escapeHtml(ordiniFilter.giorno)}"
+              onchange="ordiniFilter.giorno=this.value;render()" style="flex:1">
+            ${ordiniFilter.giorno ? `<button class="btn btn--ghost btn--small" onclick="ordiniFilter.giorno='';render()" title="Mostra tutti">×</button>` : ''}
+          </div>
+        </div>
       </div>
     </div>
+  `;
 
-    ${ordini.length === 0 ? `
+  if (data.ordini.length === 0) {
+    return filtri + `
       <div class="card empty">
         <div class="empty-icon">📋</div>
-        <div class="empty-title">${data.ordini.length === 0 ? 'Nessun ordine registrato' : 'Nessun risultato'}</div>
-        <div class="empty-text">${data.ordini.length === 0
-          ? 'Registra ogni ordine ricevuto: ti aiuta a pianificare le consegne.'
-          : 'Modifica i filtri per vedere altri risultati.'}</div>
-        ${data.ordini.length === 0 && data.clienti.length > 0 ? `<button class="btn btn--amber" onclick="openOrdineModal()">Crea il primo ordine</button>` : ''}
+        <div class="empty-title">Nessun ordine registrato</div>
+        <div class="empty-text">Registra ogni ordine ricevuto: ti aiuta a pianificare le consegne.</div>
+        ${data.clienti.length > 0 ? `<button class="btn btn--amber" onclick="openOrdineModal()">Crea il primo ordine</button>` : ''}
       </div>
-    ` : `
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Numero</th>
-              <th>Cliente</th>
-              <th>Consegna</th>
-              <th>Righe</th>
-              <th>Totale</th>
-              <th>Stato</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${ordini.map(o => {
-              const cliente = data.clienti.find(c => c.id === o.clienteId);
-              const totale = totaleOrdine(o);
-              const consegnaOggi = o.dataConsegna === oggi;
-              const inRitardo = o.dataConsegna && o.dataConsegna < oggi && o.stato === 'programmato';
-              return `
-                <tr style="cursor:pointer" onclick="if(!event.target.closest('button'))openOrdineModal('${o.id}')">
-                  <td class="mono"><strong>${escapeHtml(o.numero || '—')}</strong></td>
-                  <td>${escapeHtml(cliente?.ragioneSociale || '— eliminato —')}</td>
-                  <td>
-                    ${o.dataConsegna ? `<strong style="color:${inRitardo?'var(--red)':consegnaOggi?'var(--amber-dark)':'inherit'}">${fmtDate(o.dataConsegna)}</strong>` : '—'}
-                    ${o.oraConsegna ? `<span style="color:var(--muted);font-size:12px"> · ${o.oraConsegna}</span>` : ''}
-                  </td>
-                  <td>${(o.righe || []).length}</td>
-                  <td><strong>${fmtEur(totale)}</strong></td>
-                  <td>${statoOrdinePill(o.stato)}</td>
-                  <td>
-                    <div class="table-actions">
-                      ${o.stato === 'programmato' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();segnaConsegnato('${o.id}')" title="Segna consegnato">✓</button>` : ''}
-                      <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openOrdineModal('${o.id}')">Mod.</button>
-                      <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteOrdine('${o.id}')">×</button>
-                    </div>
-                  </td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>
-    `}
-  `;
+    `;
+  }
+
+  // Vista singolo giorno (date picker attivo)
+  if (ordiniFilter.giorno) {
+    const ordGiorno = applicaFiltriOrdini(data.ordini.filter(o => o.dataConsegna === ordiniFilter.giorno))
+      .sort((a, b) => (a.oraConsegna || '99:99').localeCompare(b.oraConsegna || '99:99'));
+    const labelGiorno = `📅 ${formattaLabelGiorno(ordiniFilter.giorno)}`;
+    return filtri + sezioneOrdiniHTML(labelGiorno, ordGiorno, { mostraData: false });
+  }
+
+  // Vista 4 sezioni (Oggi/Domani/Dopodomani/Prossimi)
+  const ordini = applicaFiltriOrdini([...data.ordini]);
+  const sortByOra = (a, b) => (a.oraConsegna || '99:99').localeCompare(b.oraConsegna || '99:99');
+  const ordOggi       = ordini.filter(o => o.dataConsegna === oggi).sort(sortByOra);
+  const ordDomani     = ordini.filter(o => o.dataConsegna === domani).sort(sortByOra);
+  const ordDopodomani = ordini.filter(o => o.dataConsegna === dopodomani).sort(sortByOra);
+  const ordProssimi   = ordini.filter(o => o.dataConsegna > dopodomani)
+    .sort((a, b) => ((a.dataConsegna || '') + (a.oraConsegna || '')).localeCompare((b.dataConsegna || '') + (b.oraConsegna || '')));
+
+  const fmtPrima = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return d.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' });
+  };
+
+  return filtri +
+    sezioneOrdiniHTML(`🌅 Oggi · ${fmtPrima(oggi)}`, ordOggi, { mostraData: false, klass: 'cliente-sezione--bianco' }) +
+    sezioneOrdiniHTML(`☀ Domani · ${fmtPrima(domani)}`, ordDomani, { mostraData: false, klass: 'cliente-sezione--verde' }) +
+    sezioneOrdiniHTML(`⏭ Dopodomani · ${fmtPrima(dopodomani)}`, ordDopodomani, { mostraData: false, klass: 'cliente-sezione--blu' }) +
+    sezioneOrdiniHTML(`📅 Prossimi (dal ${fmtPrima(new Date(Date.now() + 3 * 86400000).toISOString().slice(0,10))})`, ordProssimi, { mostraData: true });
 }
 
 function formattaLabelGiorno(isoDate) {
@@ -4471,8 +4535,16 @@ function renderGuida() {
       </ul>
 
       <div class="info-box">
-        <div class="info-box-title">Vista "📋 Tutti gli ordini"</div>
-        <p style="margin-bottom:0">In cima alla pagina Ordini c'è un secondo tab "Tutti gli ordini" che mostra la <strong>tabella tradizionale</strong> di tutti gli ordini (oggi + futuri + storici) con filtri per cliente/stato/ricerca. Utile per consultazioni più ampie.</p>
+        <div class="info-box-title">Vista "📋 Tutti gli ordini" — il pianificatore della settimana</div>
+        <p>Il secondo tab in cima alla pagina Ordini è organizzato come <strong>pianificatore settimanale</strong>: vedi 4 sezioni una sotto l'altra con gli ordini raggruppati per giorno.</p>
+        <ul style="margin-top:6px">
+          <li><strong>🌅 Oggi</strong> — gli ordini di oggi (per orario di consegna)</li>
+          <li><strong>☀ Domani</strong> — gli ordini di domani, già evidenziati per anticipare la produzione</li>
+          <li><strong>⏭ Dopodomani</strong> — gli ordini per il giorno successivo</li>
+          <li><strong>📅 Prossimi</strong> — tutti gli ordini futuri dal 3° giorno in avanti, ordinati per data più vicina in alto</li>
+        </ul>
+        <p style="margin-top:8px"><strong>Vai a un giorno specifico</strong>: in cima ai filtri c'è un selettore data. Compilalo per vedere solo gli ordini di quel giorno (anche giorni passati, utile per consultare lo storico). Premi la × per tornare alla vista standard.</p>
+        <p style="margin-top:6px;margin-bottom:0;font-size:13px;color:var(--muted)">Lo storico passato non è mostrato nella vista di default. Per vedere ordini già consegnati di un giorno passato, usa il selettore data o apri la scheda del cliente dal tab "🎯 Oggi".</p>
       </div>
 
       <h2>🔗 Come si collegano Ordini, DDT e Fatture</h2>
