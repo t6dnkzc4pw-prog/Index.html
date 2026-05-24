@@ -479,7 +479,155 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .pill--green { background: var(--green-bg); color: var(--green); }
 .pill--red { background: var(--red-bg); color: var(--red); }
 .pill--amber { background: var(--amber-bg); color: var(--amber-dark); }
+.pill--blue { background: rgba(31, 79, 130, 0.12); color: var(--navy); }
 [data-theme="dark"] .pill { background: rgba(255,255,255,0.1); }
+
+/* ═══════ CLIENTE CARD GRID (dashboard ordini) ═══════ */
+.cliente-sezione {
+  margin-bottom: 28px;
+}
+.cliente-sezione-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-family: 'Fraunces', serif;
+  font-size: 17px;
+  font-weight: 600;
+}
+.cliente-sezione-h .badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.7);
+}
+.cliente-sezione--verde .cliente-sezione-h { background: var(--green-bg); color: var(--green); }
+.cliente-sezione--blu .cliente-sezione-h { background: rgba(31, 79, 130, 0.10); color: var(--navy); }
+.cliente-sezione--bianco .cliente-sezione-h { background: var(--light-bg); color: var(--muted); }
+
+.cliente-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 600px) {
+  .cliente-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+}
+
+.cliente-card {
+  background: var(--card-bg);
+  border: 2px solid var(--grey-bord);
+  border-radius: 14px;
+  padding: 14px 12px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  min-height: 150px;
+  position: relative;
+}
+.cliente-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+.cliente-card--verde { border-color: var(--green); background: linear-gradient(180deg, var(--green-bg) 0%, var(--card-bg) 50%); }
+.cliente-card--verde:hover { border-color: var(--green); box-shadow: 0 6px 20px rgba(34,134,58,0.22); }
+.cliente-card--blu { border-color: var(--navy); background: linear-gradient(180deg, rgba(31, 79, 130, 0.12) 0%, var(--card-bg) 60%); }
+.cliente-card--blu:hover { border-color: var(--navy); box-shadow: 0 6px 20px rgba(31,79,130,0.22); }
+.cliente-card--bianco { border-color: var(--grey-bord); }
+.cliente-card--bianco:hover { border-color: var(--amber); }
+
+.cliente-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 18px;
+  color: white;
+  letter-spacing: 0.5px;
+  position: relative;
+}
+.cliente-card--verde .cliente-avatar { background: var(--green); }
+.cliente-card--blu .cliente-avatar { background: var(--navy); }
+.cliente-card--bianco .cliente-avatar { background: var(--grey-bord); color: var(--muted); }
+.cliente-avatar .check-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: white;
+  color: var(--green);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--green);
+  font-weight: 900;
+}
+.cliente-nome {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--text);
+}
+.cliente-info {
+  font-size: 11px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: auto;
+}
+.cliente-info strong { color: var(--text); }
+.cliente-info .orario { font-family: 'Inter', sans-serif; font-weight: 700; font-size: 13px; color: var(--navy); }
+.cliente-card--verde .cliente-info .orario { color: var(--green); }
+.cliente-info .nota {
+  font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* Ordini del cliente (modale drill-down) */
+.ordini-giorno-h {
+  font-family: 'Fraunces', serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 18px 0 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--grey-bord);
+}
+.ordine-mini-card {
+  padding: 12px 14px;
+  background: var(--light-bg);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  border-left: 4px solid var(--navy);
+}
+.ordine-mini-card--consegnato { border-left-color: var(--green); opacity: 0.85; }
+.ordine-mini-card--annullato { border-left-color: var(--red); opacity: 0.6; text-decoration: line-through; }
 
 /* ═══════ EMPTY ═══════ */
 .empty {
@@ -1195,12 +1343,20 @@ function generateFatturaNumero() {
 }
 
 const ORDINE_STATI = [
-  { value: 'ricevuto',     label: 'Ricevuto',     pill: 'pill' },
-  { value: 'produzione',   label: 'In produzione', pill: 'pill pill--amber' },
-  { value: 'pronto',       label: 'Pronto',       pill: 'pill pill--green' },
-  { value: 'spedito',      label: 'Spedito',      pill: 'pill' },
-  { value: 'annullato',    label: 'Annullato',    pill: 'pill pill--red' },
+  { value: 'programmato', label: 'Da consegnare', pill: 'pill pill--blue' },
+  { value: 'consegnato',  label: 'Consegnato',    pill: 'pill pill--green' },
+  { value: 'annullato',   label: 'Annullato',     pill: 'pill pill--red' },
 ];
+
+function migrateOrdiniStati() {
+  let changed = false;
+  (data.ordini || []).forEach(o => {
+    if (['ricevuto', 'produzione', 'pronto'].includes(o.stato)) { o.stato = 'programmato'; changed = true; }
+    else if (o.stato === 'spedito') { o.stato = 'consegnato'; changed = true; }
+    else if (!o.stato) { o.stato = 'programmato'; changed = true; }
+  });
+  if (changed) saveData();
+}
 
 function statoOrdineLabel(stato) {
   const s = ORDINE_STATI.find(x => x.value === stato);
@@ -1334,9 +1490,9 @@ function renderDashboard() {
   const materieScarse = data.materie.filter(m => parseFloat(m.scorta) < parseFloat(m.scortaMin)).length;
   const ultimiLotti = [...data.lotti].sort((a, b) => (b.codice || '').localeCompare(a.codice || '')).slice(0, 5);
   const ultimiHaccp = [...data.haccp].sort((a, b) => (b.data + (b.ora||'')).localeCompare(a.data + (a.ora||''))).slice(0, 3);
-  const consegneOggi = data.ordini.filter(o => o.dataConsegna === oggi && o.stato !== 'annullato' && o.stato !== 'spedito')
+  const consegneOggi = data.ordini.filter(o => o.dataConsegna === oggi && o.stato === 'programmato')
     .sort((a, b) => (a.oraConsegna || '99:99').localeCompare(b.oraConsegna || '99:99'));
-  const consegneRitardo = data.ordini.filter(o => o.dataConsegna && o.dataConsegna < oggi && o.stato !== 'spedito' && o.stato !== 'annullato');
+  const consegneRitardo = data.ordini.filter(o => o.dataConsegna && o.dataConsegna < oggi && o.stato === 'programmato');
   const insolutiTot = data.fatture.filter(f => !f.pagata).reduce((s, f) => s + (f.totale || 0), 0);
 
   const now = new Date();
@@ -1382,7 +1538,7 @@ function renderDashboard() {
       <div class="kpi kpi--blue">
         <div class="kpi-label">Consegne oggi</div>
         <div class="kpi-value">${consegneOggi.length}</div>
-        <div class="kpi-detail">${data.ordini.filter(o => o.stato !== 'spedito' && o.stato !== 'annullato').length} ordini aperti</div>
+        <div class="kpi-detail">${data.ordini.filter(o => o.stato === 'programmato').length} ordini aperti</div>
       </div>
       <div class="kpi kpi--green">
         <div class="kpi-label">Spedizioni oggi</div>
@@ -1429,7 +1585,7 @@ function renderDashboard() {
                     <td>${statoOrdinePill(o.stato)}</td>
                     <td>
                       <div class="table-actions">
-                        ${o.stato === 'pronto' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();spedisciOrdine('${o.id}')">🚚 Spedisci</button>` : ''}
+                        ${o.stato === 'programmato' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();segnaConsegnato('${o.id}')">✓ Consegnato</button>` : ''}
                       </div>
                     </td>
                   </tr>
@@ -2396,7 +2552,8 @@ function saveSped(id) {
     if (ordine) {
       ordine.ddtIds = ordine.ddtIds || [];
       if (!ordine.ddtIds.includes(s.id)) ordine.ddtIds.push(s.id);
-      ordine.stato = 'spedito';
+      ordine.stato = 'consegnato';
+      if (!ordine.consegnatoAt) ordine.consegnatoAt = new Date().toISOString();
     }
   }
 
@@ -2418,29 +2575,30 @@ function deleteSped(id) {
    PAGE: ORDINI
    ════════════════════════════════════════════════════════════════════ */
 let ordiniFilter = { search: '', clienteId: '', stato: '' };
+let ordiniTab = 'oggi';
+
+function totaleOrdine(o) {
+  return (o.righe || []).reduce((s, r) => s + (parseFloat(r.prezzo) || 0) * (parseInt(r.quantita) || 0), 0);
+}
+
+function totaliPezziOrdine(o) {
+  return (o.righe || []).reduce((s, r) => s + (parseInt(r.quantita) || 0), 0);
+}
+
+function inizialiCliente(c) {
+  if (!c || !c.ragioneSociale) return '—';
+  const parole = c.ragioneSociale.trim().split(/\s+/).filter(p => p.length > 0);
+  if (parole.length === 0) return '—';
+  if (parole.length === 1) return parole[0].slice(0, 2).toUpperCase();
+  return (parole[0][0] + parole[1][0]).toUpperCase();
+}
 
 function renderOrdini() {
-  let ordini = [...data.ordini];
-  if (ordiniFilter.search) {
-    const q = ordiniFilter.search.toLowerCase();
-    ordini = ordini.filter(o => {
-      const cliente = data.clienti.find(c => c.id === o.clienteId);
-      return (o.numero || '').toLowerCase().includes(q) ||
-             (cliente?.ragioneSociale || '').toLowerCase().includes(q) ||
-             (o.note || '').toLowerCase().includes(q);
-    });
-  }
-  if (ordiniFilter.clienteId) ordini = ordini.filter(o => o.clienteId === ordiniFilter.clienteId);
-  if (ordiniFilter.stato) ordini = ordini.filter(o => o.stato === ordiniFilter.stato);
-  ordini.sort((a,b) => (b.data || '').localeCompare(a.data || ''));
-
-  const totaleOrdine = (o) => (o.righe || []).reduce((s,r) => s + (parseFloat(r.prezzo)||0) * (parseInt(r.quantita)||0), 0);
-
   return `
     <div class="page-header">
       <div>
         <div class="page-title">Ordini</div>
-        <div class="page-subtitle">${data.ordini.length} ordini totali · ${ordini.length} mostrati</div>
+        <div class="page-subtitle">${data.ordini.filter(o => o.dataConsegna === new Date().toISOString().slice(0,10) && o.stato === 'programmato').length} da consegnare oggi · ${data.ordini.length} totali</div>
       </div>
       <button class="btn btn--amber" onclick="openOrdineModal()" ${data.clienti.length===0?'disabled':''}>+ Nuovo ordine</button>
     </div>
@@ -2455,6 +2613,158 @@ function renderOrdini() {
       </div>
     ` : ''}
 
+    <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--grey-bord);flex-wrap:wrap">
+      <button class="btn ${ordiniTab==='oggi'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="ordiniTab='oggi';render()">🎯 Oggi</button>
+      <button class="btn ${ordiniTab==='tabella'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="ordiniTab='tabella';render()">📋 Tutti gli ordini (${data.ordini.length})</button>
+    </div>
+
+    ${ordiniTab === 'oggi' ? renderOrdiniOggi() : renderOrdiniTabella()}
+  `;
+}
+
+function renderOrdiniOggi() {
+  const oggi = new Date().toISOString().slice(0, 10);
+  if (data.clienti.length === 0) return '';
+
+  // Mappa cliente → ordini di oggi
+  const ordiniOggiByClient = {};
+  data.ordini.forEach(o => {
+    if (o.dataConsegna === oggi && (o.stato === 'programmato' || o.stato === 'consegnato')) {
+      ordiniOggiByClient[o.clienteId] = ordiniOggiByClient[o.clienteId] || [];
+      ordiniOggiByClient[o.clienteId].push(o);
+    }
+  });
+
+  // Per ogni cliente, scegli lo stato "rappresentativo": se ha almeno un programmato → blu, altrimenti verde
+  const clientiVerdi = []; // tutti consegnati
+  const clientiBlu = [];   // almeno un programmato
+  const clientiBianchi = []; // no ordini oggi
+
+  data.clienti.forEach(c => {
+    const ordini = ordiniOggiByClient[c.id];
+    if (!ordini || ordini.length === 0) {
+      clientiBianchi.push(c);
+    } else if (ordini.every(o => o.stato === 'consegnato')) {
+      clientiVerdi.push({ cliente: c, ordini });
+    } else {
+      clientiBlu.push({ cliente: c, ordini });
+    }
+  });
+
+  // Ordinamento blu per orario crescente (ordini programmati)
+  clientiBlu.sort((a, b) => {
+    const oraA = a.ordini.filter(o => o.stato === 'programmato').map(o => o.oraConsegna || '99:99').sort()[0] || '99:99';
+    const oraB = b.ordini.filter(o => o.stato === 'programmato').map(o => o.oraConsegna || '99:99').sort()[0] || '99:99';
+    return oraA.localeCompare(oraB);
+  });
+  // Verdi per orario di consegna (più recente prima)
+  clientiVerdi.sort((a, b) => {
+    const tsA = a.ordini.map(o => o.consegnatoAt || '').sort().reverse()[0] || '';
+    const tsB = b.ordini.map(o => o.consegnatoAt || '').sort().reverse()[0] || '';
+    return tsB.localeCompare(tsA);
+  });
+  // Bianchi alfabetico
+  clientiBianchi.sort((a, b) => (a.ragioneSociale || '').localeCompare(b.ragioneSociale || ''));
+
+  return `
+    <div class="cliente-sezione cliente-sezione--verde">
+      <div class="cliente-sezione-h">
+        🟢 Consegnati oggi <span class="badge">${clientiVerdi.length}</span>
+      </div>
+      ${clientiVerdi.length === 0 ? `
+        <div style="padding:14px;color:var(--muted);font-style:italic;font-size:13px">Nessuna consegna ancora completata oggi.</div>
+      ` : `
+        <div class="cliente-grid">
+          ${clientiVerdi.map(({cliente, ordini}) => clienteCardHTML(cliente, ordini, 'verde')).join('')}
+        </div>
+      `}
+    </div>
+
+    <div class="cliente-sezione cliente-sezione--blu">
+      <div class="cliente-sezione-h">
+        🔵 Da consegnare oggi <span class="badge">${clientiBlu.length}</span>
+      </div>
+      ${clientiBlu.length === 0 ? `
+        <div style="padding:14px;color:var(--muted);font-style:italic;font-size:13px">Tutti gli ordini di oggi sono stati consegnati! 🎉</div>
+      ` : `
+        <div class="cliente-grid">
+          ${clientiBlu.map(({cliente, ordini}) => clienteCardHTML(cliente, ordini, 'blu')).join('')}
+        </div>
+      `}
+    </div>
+
+    <div class="cliente-sezione cliente-sezione--bianco">
+      <div class="cliente-sezione-h">
+        ⚪ Altri clienti (no ordine oggi) <span class="badge">${clientiBianchi.length}</span>
+      </div>
+      ${clientiBianchi.length === 0 ? `
+        <div style="padding:14px;color:var(--muted);font-style:italic;font-size:13px">Tutti i clienti hanno un ordine oggi.</div>
+      ` : `
+        <div class="cliente-grid">
+          ${clientiBianchi.map(c => clienteCardHTML(c, [], 'bianco')).join('')}
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function clienteCardHTML(cliente, ordiniOggi, variante) {
+  const iniziali = inizialiCliente(cliente);
+  const nome = escapeHtml(cliente.ragioneSociale || '—');
+  let info = '';
+
+  if (variante === 'verde') {
+    const orari = ordiniOggi.map(o => o.consegnatoAt ? new Date(o.consegnatoAt).toLocaleTimeString('it-IT', {hour:'2-digit', minute:'2-digit'}) : (o.oraConsegna || '')).filter(x => x);
+    const note = ordiniOggi.map(o => o.noteConsegna).filter(n => n && n.trim()).join(' · ');
+    info = `
+      <div class="cliente-info">
+        ${orari.length > 0 ? `<div class="orario">✓ ${escapeHtml(orari.join(' · '))}</div>` : '<div class="orario">✓ Consegnato</div>'}
+        ${note ? `<div class="nota" title="${escapeHtml(note)}">"${escapeHtml(note)}"</div>` : ''}
+      </div>
+    `;
+  } else if (variante === 'blu') {
+    const ordiniProg = ordiniOggi.filter(o => o.stato === 'programmato');
+    const orari = ordiniProg.map(o => o.oraConsegna).filter(x => x);
+    const totPezzi = ordiniProg.reduce((s, o) => s + totaliPezziOrdine(o), 0);
+    const totEur = ordiniProg.reduce((s, o) => s + totaleOrdine(o), 0);
+    info = `
+      <div class="cliente-info">
+        <div class="orario">⏰ ${orari.length > 0 ? escapeHtml(orari.sort().join(' · ')) : 'Senza orario'}</div>
+        <div><strong>${totPezzi}</strong> pz${totEur > 0 ? ` · ${fmtEur(totEur)}` : ''}</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="cliente-card cliente-card--${variante}" onclick="apriSchedaOrdineCliente('${cliente.id}')">
+      <div class="cliente-avatar">
+        ${iniziali}
+        ${variante === 'verde' ? '<span class="check-badge">✓</span>' : ''}
+      </div>
+      <div class="cliente-nome">${nome}</div>
+      ${info}
+    </div>
+  `;
+}
+
+function renderOrdiniTabella() {
+  let ordini = [...data.ordini];
+  if (ordiniFilter.search) {
+    const q = ordiniFilter.search.toLowerCase();
+    ordini = ordini.filter(o => {
+      const cliente = data.clienti.find(c => c.id === o.clienteId);
+      return (o.numero || '').toLowerCase().includes(q) ||
+             (cliente?.ragioneSociale || '').toLowerCase().includes(q) ||
+             (o.note || '').toLowerCase().includes(q);
+    });
+  }
+  if (ordiniFilter.clienteId) ordini = ordini.filter(o => o.clienteId === ordiniFilter.clienteId);
+  if (ordiniFilter.stato) ordini = ordini.filter(o => o.stato === ordiniFilter.stato);
+  ordini.sort((a,b) => (b.dataConsegna || b.data || '').localeCompare(a.dataConsegna || a.data || ''));
+
+  const oggi = new Date().toISOString().slice(0,10);
+
+  return `
     <div class="card" style="margin-bottom:20px">
       <div class="form-grid">
         <div class="field">
@@ -2484,7 +2794,7 @@ function renderOrdini() {
         <div class="empty-icon">📋</div>
         <div class="empty-title">${data.ordini.length === 0 ? 'Nessun ordine registrato' : 'Nessun risultato'}</div>
         <div class="empty-text">${data.ordini.length === 0
-          ? 'Registra ogni ordine ricevuto: ti aiuta a pianificare la produzione e fatturare correttamente.'
+          ? 'Registra ogni ordine ricevuto: ti aiuta a pianificare le consegne.'
           : 'Modifica i filtri per vedere altri risultati.'}</div>
         ${data.ordini.length === 0 && data.clienti.length > 0 ? `<button class="btn btn--amber" onclick="openOrdineModal()">Crea il primo ordine</button>` : ''}
       </div>
@@ -2494,7 +2804,6 @@ function renderOrdini() {
           <thead>
             <tr>
               <th>Numero</th>
-              <th>Data</th>
               <th>Cliente</th>
               <th>Consegna</th>
               <th>Righe</th>
@@ -2507,12 +2816,11 @@ function renderOrdini() {
             ${ordini.map(o => {
               const cliente = data.clienti.find(c => c.id === o.clienteId);
               const totale = totaleOrdine(o);
-              const consegnaOggi = o.dataConsegna === new Date().toISOString().slice(0,10);
-              const inRitardo = o.dataConsegna && o.dataConsegna < new Date().toISOString().slice(0,10) && o.stato !== 'spedito' && o.stato !== 'annullato';
+              const consegnaOggi = o.dataConsegna === oggi;
+              const inRitardo = o.dataConsegna && o.dataConsegna < oggi && o.stato === 'programmato';
               return `
                 <tr style="cursor:pointer" onclick="if(!event.target.closest('button'))openOrdineModal('${o.id}')">
                   <td class="mono"><strong>${escapeHtml(o.numero || '—')}</strong></td>
-                  <td>${fmtDate(o.data)}</td>
                   <td>${escapeHtml(cliente?.ragioneSociale || '— eliminato —')}</td>
                   <td>
                     ${o.dataConsegna ? `<strong style="color:${inRitardo?'var(--red)':consegnaOggi?'var(--amber-dark)':'inherit'}">${fmtDate(o.dataConsegna)}</strong>` : '—'}
@@ -2523,8 +2831,8 @@ function renderOrdini() {
                   <td>${statoOrdinePill(o.stato)}</td>
                   <td>
                     <div class="table-actions">
-                      ${o.stato === 'pronto' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();spedisciOrdine('${o.id}')" title="Crea DDT">🚚 Spedisci</button>` : ''}
-                      <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openOrdineModal('${o.id}')">${o.stato==='spedito'?'Vedi':'Mod.'}</button>
+                      ${o.stato === 'programmato' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();segnaConsegnato('${o.id}')" title="Segna consegnato">✓</button>` : ''}
+                      <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openOrdineModal('${o.id}')">Mod.</button>
                       <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteOrdine('${o.id}')">×</button>
                     </div>
                   </td>
@@ -2536,6 +2844,177 @@ function renderOrdini() {
       </div>
     `}
   `;
+}
+
+function formattaLabelGiorno(isoDate) {
+  if (!isoDate) return '—';
+  const oggi = new Date().toISOString().slice(0, 10);
+  const domani = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  if (isoDate === oggi) return 'OGGI · ' + fmtDate(isoDate);
+  if (isoDate === domani) return 'DOMANI · ' + fmtDate(isoDate);
+  try {
+    const d = new Date(isoDate + 'T00:00:00');
+    const giorni = ['DOM','LUN','MAR','MER','GIO','VEN','SAB'];
+    return `${giorni[d.getDay()]} · ${fmtDate(isoDate)}`;
+  } catch(e) {
+    return fmtDate(isoDate);
+  }
+}
+
+function apriSchedaOrdineCliente(clienteId) {
+  const cliente = data.clienti.find(c => c.id === clienteId);
+  if (!cliente) return;
+  const oggi = new Date().toISOString().slice(0, 10);
+  const limite30gg = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const ordini = data.ordini.filter(o => o.clienteId === clienteId);
+
+  const programmatiOggi = ordini.filter(o => o.stato === 'programmato' && o.dataConsegna === oggi);
+  const futuri = ordini.filter(o => o.stato === 'programmato' && o.dataConsegna > oggi && o.dataConsegna <= limite30gg)
+    .sort((a, b) => (a.dataConsegna + (a.oraConsegna || '')).localeCompare(b.dataConsegna + (b.oraConsegna || '')));
+  const consegnatiOggi = ordini.filter(o => o.stato === 'consegnato' && o.dataConsegna === oggi);
+  const storico = ordini.filter(o => (o.stato === 'consegnato' || o.stato === 'annullato') && o.dataConsegna !== oggi)
+    .sort((a, b) => (b.dataConsegna || '').localeCompare(a.dataConsegna || ''))
+    .slice(0, 20);
+
+  // raggruppa futuri per giorno
+  const futuriByGiorno = {};
+  futuri.forEach(o => {
+    futuriByGiorno[o.dataConsegna] = futuriByGiorno[o.dataConsegna] || [];
+    futuriByGiorno[o.dataConsegna].push(o);
+  });
+
+  const ordineMiniHTML = (o, mostraConsegna) => {
+    const klass = o.stato === 'consegnato' ? 'ordine-mini-card--consegnato' : o.stato === 'annullato' ? 'ordine-mini-card--annullato' : '';
+    const righeText = (o.righe || []).map(r => {
+      const p = data.prodotti.find(x => x.id === r.prodottoId);
+      return `${r.quantita} × ${escapeHtml(p?.nome || '—')}`;
+    }).join('<br>');
+    const tot = totaleOrdine(o);
+    return `
+      <div class="ordine-mini-card ${klass}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-weight:700;color:var(--navy);margin-bottom:4px">
+              ${o.oraConsegna ? `⏰ ${escapeHtml(o.oraConsegna)}` : '⏰ Senza orario'}
+              ${o.stato === 'consegnato' ? `<span style="color:var(--green);margin-left:8px">✓ Consegnato</span>` : ''}
+            </div>
+            <div style="font-size:13px;line-height:1.5">${righeText || '<em style="color:var(--muted)">Nessuna riga</em>'}</div>
+            ${tot > 0 ? `<div style="font-size:13px;color:var(--muted);margin-top:4px">Tot: <strong style="color:var(--navy)">${fmtEur(tot)}</strong></div>` : ''}
+            ${o.noteConsegna ? `<div style="font-size:12px;color:var(--green);margin-top:4px;font-style:italic">Nota: ${escapeHtml(o.noteConsegna)}</div>` : ''}
+            ${o.note ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">${escapeHtml(o.note)}</div>` : ''}
+          </div>
+          <div class="table-actions" style="flex-shrink:0">
+            ${o.stato === 'programmato' && mostraConsegna ? `<button class="btn btn--amber btn--small" onclick="segnaConsegnato('${o.id}')">✓ Consegnato</button>` : ''}
+            ${o.stato === 'consegnato' ? `<button class="btn btn--ghost btn--small" onclick="riapriOrdine('${o.id}')" title="Annulla consegna">↶</button>` : ''}
+            <button class="btn btn--ghost btn--small" onclick="openOrdineModal('${o.id}')">Mod.</button>
+            <button class="btn btn--danger btn--small" onclick="deleteOrdine('${o.id}', true)">×</button>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
+  showModal({
+    title: cliente.ragioneSociale,
+    body: `
+      <div style="color:var(--muted);font-size:13px;margin-bottom:18px;display:flex;gap:14px;flex-wrap:wrap">
+        ${cliente.telefono ? `<span>📞 ${escapeHtml(cliente.telefono)}</span>` : ''}
+        ${cliente.email ? `<span>📧 ${escapeHtml(cliente.email)}</span>` : ''}
+        ${cliente.indirizzo ? `<span>📍 ${escapeHtml(cliente.indirizzo)}</span>` : ''}
+      </div>
+
+      ${(programmatiOggi.length + consegnatiOggi.length) > 0 ? `
+        <div class="ordini-giorno-h">${formattaLabelGiorno(oggi)}</div>
+        ${programmatiOggi.map(o => ordineMiniHTML(o, true)).join('')}
+        ${consegnatiOggi.map(o => ordineMiniHTML(o, false)).join('')}
+      ` : ''}
+
+      ${Object.keys(futuriByGiorno).sort().map(g => `
+        <div class="ordini-giorno-h">${formattaLabelGiorno(g)}</div>
+        ${futuriByGiorno[g].map(o => ordineMiniHTML(o, false)).join('')}
+      `).join('')}
+
+      ${(programmatiOggi.length + consegnatiOggi.length + futuri.length) === 0 ? `
+        <div style="text-align:center;padding:20px;color:var(--muted);font-style:italic">Nessun ordine pendente per questo cliente.</div>
+      ` : ''}
+
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--grey-bord)">
+        <button class="btn btn--amber" style="width:100%" onclick="closeModal();openOrdineModal(null, {clienteId:'${cliente.id}'})">+ Nuovo ordine per questo cliente</button>
+      </div>
+
+      ${storico.length > 0 ? `
+        <details style="margin-top:18px">
+          <summary style="cursor:pointer;font-weight:600;color:var(--muted);padding:8px 0">▸ Storico ultimi ordini (${storico.length})</summary>
+          <div style="margin-top:10px;display:grid;gap:6px;font-size:13px">
+            ${storico.map(o => {
+              const orarioCons = o.consegnatoAt ? new Date(o.consegnatoAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) : (o.oraConsegna || '—');
+              const stato = o.stato === 'consegnato' ? '✓' : '✗';
+              return `<div style="padding:8px 12px;background:var(--light-bg);border-radius:6px;cursor:pointer" onclick="closeModal();openOrdineModal('${o.id}')">
+                <strong>${fmtDate(o.dataConsegna)}</strong> ${stato} ${orarioCons} · ${totaliPezziOrdine(o)} pz · ${fmtEur(totaleOrdine(o))}
+                ${o.noteConsegna ? `<div style="font-size:11px;color:var(--muted);font-style:italic;margin-top:2px">${escapeHtml(o.noteConsegna)}</div>` : ''}
+              </div>`;
+            }).join('')}
+          </div>
+        </details>
+      ` : ''}
+    `,
+    footer: `<button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>`
+  });
+}
+
+function segnaConsegnato(ordineId) {
+  const o = data.ordini.find(x => x.id === ordineId);
+  if (!o) return;
+  const cliente = data.clienti.find(c => c.id === o.clienteId);
+  showModal({
+    title: `✓ Segna consegnato`,
+    body: `
+      <div style="margin-bottom:14px">
+        <div style="color:var(--muted);font-size:13px">Cliente</div>
+        <div style="font-family:'Fraunces',serif;font-size:18px;color:var(--navy);font-weight:600">${escapeHtml(cliente?.ragioneSociale || '—')}</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:6px">${(o.righe || []).length} righe · ${totaliPezziOrdine(o)} pezzi · ${fmtEur(totaleOrdine(o))}</div>
+      </div>
+      <form id="consegnaForm">
+        <div class="field">
+          <label class="field-label">Nota di consegna (opzionale)</label>
+          <textarea class="field-textarea" name="nota" placeholder="Es. lasciato in dispensa lato cortile, mancavano 5 cornetti, ecc." style="min-height:80px"></textarea>
+          <div class="field-help">Resterà visibile sulla card e nello storico</div>
+        </div>
+      </form>
+    `,
+    footer: `
+      <button class="btn btn--ghost" onclick="closeModal()">Annulla</button>
+      <button class="btn btn--amber" onclick="confermaConsegnato('${ordineId}')">✓ Segna consegnato</button>
+    `
+  });
+}
+
+function confermaConsegnato(ordineId) {
+  const o = data.ordini.find(x => x.id === ordineId);
+  if (!o) return;
+  const form = document.getElementById('consegnaForm');
+  const nota = form ? form.querySelector('[name="nota"]').value : '';
+  o.stato = 'consegnato';
+  o.consegnatoAt = new Date().toISOString();
+  o.noteConsegna = (nota || '').trim();
+  saveData();
+  closeModal();
+  render();
+  const cliente = data.clienti.find(c => c.id === o.clienteId);
+  toast(`✓ Consegnato a ${cliente?.ragioneSociale || 'cliente'}`);
+}
+
+function riapriOrdine(ordineId) {
+  const o = data.ordini.find(x => x.id === ordineId);
+  if (!o) return;
+  if (!confirm(`Annullare la consegna dell'ordine ${o.numero}? Tornerà nello stato "Da consegnare".`)) return;
+  o.stato = 'programmato';
+  o.consegnatoAt = null;
+  o.noteConsegna = '';
+  saveData();
+  closeModal();
+  render();
+  toast('Ordine riportato in "Da consegnare"', 'info');
 }
 
 function ordineRigaHTML(idx, riga) {
@@ -2634,54 +3113,46 @@ function rerenderOrdineRighe() {
   aggiornaTotaleOrdine();
 }
 
-function openOrdineModal(id) {
+function openOrdineModal(id, prefill) {
   const o = id ? data.ordini.find(x => x.id === id) : null;
   const oggi = new Date().toISOString().slice(0, 10);
-  const readonly = o?.stato === 'spedito';
   ordineDraftRighe = o ? [...(o.righe || [])] : [];
   if (ordineDraftRighe.length === 0) ordineDraftRighe.push({ prodottoId: '', quantita: '', prezzo: '' });
+  const clienteIdInit = o?.clienteId || prefill?.clienteId || '';
+  const dataConsegnaInit = o?.dataConsegna || prefill?.dataConsegna || oggi;
 
   showModal({
-    title: o ? (readonly ? `Ordine ${o.numero} (spedito)` : `Modifica ordine ${o.numero}`) : 'Nuovo ordine',
+    title: o ? `Modifica ordine ${o.numero}` : 'Nuovo ordine',
     body: `
-      ${readonly ? `
-        <div class="banner banner--info">
-          <div class="banner-icon">i</div>
-          <div class="banner-content">
-            <div class="banner-title">Ordine già spedito</div>
-            <div>Questo ordine ha generato un DDT e non può più essere modificato. Per correzioni, modifica il DDT collegato.</div>
-          </div>
-        </div>
-      ` : ''}
-      <form id="ordineForm" ${readonly ? 'onsubmit="return false"' : ''}>
+      <form id="ordineForm">
         <div class="form-grid">
           <div class="field">
             <label class="field-label">Data ordine</label>
-            <input type="date" class="field-input" name="data" value="${o?.data || oggi}" required ${readonly?'disabled':''}>
+            <input type="date" class="field-input" name="data" value="${o?.data || oggi}" required>
           </div>
           <div class="field">
             <label class="field-label">Numero ordine</label>
-            <input type="text" class="field-input mono" name="numero" value="${escapeHtml(o?.numero || generateOrdineNumero())}" required ${readonly?'disabled':''}>
+            <input type="text" class="field-input mono" name="numero" value="${escapeHtml(o?.numero || generateOrdineNumero())}" required>
           </div>
           <div class="field field--full">
             <label class="field-label">Cliente</label>
-            <select class="field-select" name="clienteId" required ${readonly?'disabled':''} onchange="onOrdineRigaChange(0)">
+            <select class="field-select" name="clienteId" required onchange="onOrdineRigaChange(0)">
               <option value="">— Seleziona cliente —</option>
-              ${data.clienti.map(c => `<option value="${c.id}" ${o?.clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
+              ${data.clienti.map(c => `<option value="${c.id}" ${clienteIdInit===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
             </select>
           </div>
           <div class="field">
-            <label class="field-label">Data consegna prevista</label>
-            <input type="date" class="field-input" name="dataConsegna" value="${o?.dataConsegna || ''}" required ${readonly?'disabled':''}>
+            <label class="field-label">Data consegna</label>
+            <input type="date" class="field-input" name="dataConsegna" value="${dataConsegnaInit}" required>
           </div>
           <div class="field">
             <label class="field-label">Orario consegna (opzionale)</label>
-            <input type="time" class="field-input" name="oraConsegna" value="${o?.oraConsegna || ''}" ${readonly?'disabled':''}>
+            <input type="time" class="field-input" name="oraConsegna" value="${o?.oraConsegna || ''}">
           </div>
-          <div class="field">
+          <div class="field field--full">
             <label class="field-label">Stato</label>
-            <select class="field-select" name="stato" ${readonly?'disabled':''}>
-              ${ORDINE_STATI.map(s => `<option value="${s.value}" ${(o?.stato || 'ricevuto')===s.value?'selected':''}>${s.label}</option>`).join('')}
+            <select class="field-select" name="stato">
+              ${ORDINE_STATI.map(s => `<option value="${s.value}" ${(o?.stato || 'programmato')===s.value?'selected':''}>${s.label}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -2689,7 +3160,7 @@ function openOrdineModal(id) {
         <div style="margin-top:20px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
             <div class="field-label" style="margin:0">Righe ordine</div>
-            ${!readonly ? `<button type="button" class="btn btn--ghost btn--small" onclick="aggiungiRigaOrdine()">+ Aggiungi riga</button>` : ''}
+            <button type="button" class="btn btn--ghost btn--small" onclick="aggiungiRigaOrdine()">+ Aggiungi riga</button>
           </div>
           <div id="ordineRighe">
             ${ordineDraftRighe.map((r, i) => ordineRigaHTML(i, r)).join('')}
@@ -2701,14 +3172,12 @@ function openOrdineModal(id) {
         </div>
 
         <div class="field field--full" style="margin-top:16px">
-          <label class="field-label">Note</label>
-          <textarea class="field-textarea" name="note" ${readonly?'disabled':''} placeholder="Es. consegnare prima delle 8, lasciare in dispensa...">${escapeHtml(o?.note || '')}</textarea>
+          <label class="field-label">Note (opzionali)</label>
+          <textarea class="field-textarea" name="note" placeholder="Es. consegnare prima delle 8, lasciare in dispensa...">${escapeHtml(o?.note || '')}</textarea>
         </div>
       </form>
     `,
-    footer: readonly ? `
-      <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
-    ` : `
+    footer: `
       <button class="btn btn--ghost" onclick="closeModal()">Annulla</button>
       <button class="btn btn--amber" onclick="saveOrdine('${id || ''}')">${o ? 'Salva modifiche' : 'Crea ordine'}</button>
     `
@@ -2728,8 +3197,9 @@ function saveOrdine(id) {
   if (righe.length === 0) { toast('Aggiungi almeno una riga valida', 'error'); return; }
 
   let o = id ? data.ordini.find(x => x.id === id) : null;
+  const isNew = !o;
   if (!o) {
-    o = { id: uid(), createdAt: new Date().toISOString(), ddtIds: [] };
+    o = { id: uid(), createdAt: new Date().toISOString(), ddtIds: [], consegnatoAt: null, noteConsegna: '' };
     data.ordini.push(o);
   }
   o.numero = fd.get('numero');
@@ -2737,42 +3207,35 @@ function saveOrdine(id) {
   o.clienteId = clienteId;
   o.dataConsegna = dataConsegna;
   o.oraConsegna = fd.get('oraConsegna');
-  o.stato = fd.get('stato') || 'ricevuto';
+  const nuovoStato = fd.get('stato') || 'programmato';
+  if (o.stato !== 'consegnato' && nuovoStato === 'consegnato') {
+    o.consegnatoAt = new Date().toISOString();
+  } else if (nuovoStato !== 'consegnato') {
+    o.consegnatoAt = null;
+  }
+  o.stato = nuovoStato;
   o.note = fd.get('note');
   o.righe = righe;
 
   saveData();
   closeModal();
   render();
-  toast(id ? 'Ordine aggiornato' : `Ordine ${o.numero} creato`);
+  toast(isNew ? `Ordine ${o.numero} creato` : 'Ordine aggiornato');
 }
 
-function deleteOrdine(id) {
+function deleteOrdine(id, fromScheda) {
   const o = data.ordini.find(x => x.id === id);
   if (!o) return;
   if (!confirm(`Eliminare l'ordine ${o.numero}?`)) return;
+  const clienteId = o.clienteId;
   data.ordini = data.ordini.filter(x => x.id !== id);
   saveData();
+  if (fromScheda) {
+    closeModal();
+    setTimeout(() => apriSchedaOrdineCliente(clienteId), 100);
+  }
   render();
   toast('Ordine eliminato', 'info');
-}
-
-function spedisciOrdine(id) {
-  const o = data.ordini.find(x => x.id === id);
-  if (!o) return;
-  if (data.lotti.length === 0) {
-    toast('Devi prima registrare almeno un lotto di produzione', 'error');
-    return;
-  }
-  const totRiga = o.righe?.[0];
-  openSpedModal(null, {
-    ordineId: o.id,
-    ordineNumero: o.numero,
-    clienteId: o.clienteId,
-    quantita: totRiga?.quantita || '',
-    prezzoUnitario: totRiga?.prezzo || '',
-    note: `Ordine ${o.numero}` + (o.note ? '\n' + o.note : ''),
-  });
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -3960,54 +4423,88 @@ function renderGuida() {
       <h3>Desktop (Chrome / Edge)</h3>
       <p>Nella barra degli indirizzi appare un'icona <strong>"Installa"</strong> a destra. Cliccala e conferma.</p>
 
-      <h2>📋 Flusso commerciale completo: Ordine → DDT → Fattura</h2>
+      <h2>📋 Ordini — la dashboard delle consegne del giorno</h2>
 
       <div class="info-box">
-        <div class="info-box-title">Il ciclo di vita di una commessa</div>
-        <p style="margin-bottom:0">Il cliente ordina → tu produci → spedisci con DDT → a fine mese aggreghi i DDT in fattura → segni quando viene pagata.</p>
+        <div class="info-box-title">Come funziona la sezione Ordini</div>
+        <p>La pagina Ordini è la <strong>dashboard operativa del giorno</strong>: a colpo d'occhio vedi tutti i tuoi clienti come icone (avatar con le iniziali) e capisci immediatamente quali consegne hai fatto e quali devi ancora fare.</p>
       </div>
 
-      <h3>1. Quando ricevi materie prime</h3>
-      <p>Vai su <strong>Materie prime</strong>, clicca sulla riga e aggiorna il <strong>lotto fornitore</strong> e la data di consegna.</p>
-
-      <h3>2. Quando un cliente ti chiama per un ordine</h3>
-      <p>Sezione <strong>Ordini</strong> &rarr; <strong>+ Nuovo ordine</strong>:</p>
+      <h3>I 3 settori della dashboard</h3>
+      <p>Aprendo <strong>Ordini</strong> vedi 3 settori uno sotto l'altro:</p>
       <ul>
-        <li>Seleziona il cliente</li>
-        <li>Indica <strong>data e orario di consegna previsto</strong> (es. domani alle 07:30)</li>
-        <li>Aggiungi una o più <strong>righe</strong>: prodotto + quantità. Il prezzo unitario si compila automaticamente dal listino del cliente (modificabile)</li>
-        <li>Salva. Stato iniziale: <strong>Ricevuto</strong></li>
-      </ul>
-      <p>L'ordine è <strong>modificabile in qualsiasi momento</strong> finché non viene spedito. Quando inizi a produrlo cambia lo stato a <strong>In produzione</strong>, poi a <strong>Pronto</strong>.</p>
-
-      <h3>3. Quando produci un lotto</h3>
-      <p>Sezione <strong>Produzione &amp; Lotti</strong> &rarr; <strong>+ Nuovo lotto</strong>. Compila data, turno, prodotto, quantità. Il codice lotto viene generato automaticamente.</p>
-
-      <h3>4. Quando stampi le etichette del cartone</h3>
-      <p>Dalla riga del lotto, tocca l'icona <strong>🏷️</strong>. Si apre l'anteprima dell'etichetta, premi <strong>Stampa</strong>.</p>
-
-      <h3>5. Quando spedisci l'ordine</h3>
-      <p>Hai due strade:</p>
-      <ul>
-        <li><strong>Dall'ordine</strong>: se l'ordine è in stato "Pronto", premi <strong>🚚 Spedisci</strong>. Si apre il modale DDT con cliente, quantità e prezzo già compilati. Conferma e il DDT viene creato, l'ordine passa a "Spedito".</li>
-        <li><strong>Spedizione diretta</strong>: sezione <strong>Spedizioni</strong> &rarr; <strong>+ Nuova spedizione</strong>. Associa lotto + cliente + DDT manualmente.</li>
-      </ul>
-      <p>Il <strong>prezzo unitario</strong> viene salvato sul DDT al momento della creazione (non cambia retroattivamente se modifichi il listino dopo).</p>
-
-      <h3>6. A fine mese: emissione fatture</h3>
-      <p>Sezione <strong>Fatturazione</strong>, tab <strong>"Da fatturare"</strong>:</p>
-      <ul>
-        <li>Vedi una card per ogni cliente con DDT non ancora fatturati</li>
-        <li>Premi <strong>📄 Prepara fattura</strong> → si apre l'anteprima con righe, imponibile, IVA, totale</li>
-        <li>Da qui puoi: <strong>🖨 Stampare PDF</strong>, scaricare <strong>📥 XML FatturaPA</strong>, inviare via <strong>📧 email</strong></li>
-        <li>Quando confermi, la fattura viene archiviata e i DDT vengono marcati "Fatturato"</li>
+        <li><strong>🟢 Consegnati oggi</strong> (verde): clienti a cui hai già consegnato — vedi l'orario di consegna e l'eventuale nota lasciata</li>
+        <li><strong>🔵 Da consegnare oggi</strong> (blu): clienti con un ordine programmato per oggi — vedi orario previsto, numero pezzi e importo</li>
+        <li><strong>⚪ Altri clienti</strong> (bianco): tutti gli altri clienti che non hanno ordini per oggi</li>
       </ul>
 
-      <h3>7. Quando il cliente paga</h3>
-      <p>Tab <strong>"Emesse"</strong> della Fatturazione, oppure dalla scheda cliente → tab Fatture: premi <strong>Segna pagata</strong> e inserisci la data del pagamento.</p>
+      <h3>Il flusso tipico mattutino</h3>
+      <ol>
+        <li>Apri l'app, vai su <strong>Ordini</strong></li>
+        <li>Vedi tutte le icone <strong>BLU</strong> ordinate per orario di consegna</li>
+        <li>Esci a consegnare. Quando hai finito una consegna:</li>
+        <li>Clicchi sull'icona del cliente → si apre la scheda con i dettagli</li>
+        <li>Premi <strong>✓ Segna consegnato</strong>, puoi aggiungere una nota (es. "lasciato in dispensa")</li>
+        <li>L'icona si sposta automaticamente nel settore <strong>VERDE</strong></li>
+        <li>Continui finché tutte le icone sono verdi 🎉</li>
+      </ol>
 
-      <h3>8. Ogni giorno (HACCP)</h3>
-      <p>Registra le <strong>temperature</strong> di cella, abbattitore e freezer.</p>
+      <h3>Creare e programmare ordini futuri</h3>
+      <ul>
+        <li><strong>Nuovo ordine al volo</strong>: pulsante in alto a destra <strong>+ Nuovo ordine</strong></li>
+        <li><strong>Cliente che non ha ordini oggi (bianco)</strong>: clicca direttamente sull'icona → si apre la modale già con quel cliente selezionato e data = oggi (modificabile per programmare un giorno futuro)</li>
+        <li><strong>Cliente che ha già ordini</strong>: clicca sull'icona → vedi la sua scheda con OGGI + tutti gli ordini programmati nei prossimi 30gg + storico recente. Da qui puoi premere "+ Nuovo ordine per questo cliente" per aggiungerne uno</li>
+      </ul>
+
+      <h3>Modificare o annullare</h3>
+      <ul>
+        <li>Gli ordini sono <strong>sempre modificabili</strong> finché non vengono contrassegnati come consegnati</li>
+        <li>Anche dopo "consegnato" puoi <strong>riaprire</strong> l'ordine cliccando sul pulsante ↶ nella scheda cliente (utile se hai cliccato per errore)</li>
+        <li>Per eliminare un ordine: scheda cliente → pulsante × sulla riga dell'ordine</li>
+      </ul>
+
+      <h3>I 3 stati dell'ordine</h3>
+      <ul>
+        <li><strong>Da consegnare</strong>: stato di default quando crei un ordine (icona blu)</li>
+        <li><strong>Consegnato</strong>: dopo aver premuto "✓ Segna consegnato" (icona verde)</li>
+        <li><strong>Annullato</strong>: per ordini cancellati dal cliente (non appaiono nella dashboard di oggi)</li>
+      </ul>
+
+      <div class="info-box">
+        <div class="info-box-title">Vista "📋 Tutti gli ordini"</div>
+        <p style="margin-bottom:0">In cima alla pagina Ordini c'è un secondo tab "Tutti gli ordini" che mostra la <strong>tabella tradizionale</strong> di tutti gli ordini (oggi + futuri + storici) con filtri per cliente/stato/ricerca. Utile per consultazioni più ampie.</p>
+      </div>
+
+      <h2>🔗 Come si collegano Ordini, DDT e Fatture</h2>
+
+      <div class="info-box">
+        <div class="info-box-title">Due flussi separati ma complementari</div>
+        <p>Da questa versione gli <strong>Ordini</strong> sono pensati per il <strong>tracciamento operativo giornaliero</strong> delle consegne, mentre <strong>DDT</strong> e <strong>Fatture</strong> restano per la <strong>documentazione fiscale</strong>. I due flussi sono indipendenti.</p>
+      </div>
+
+      <h3>1. Flusso operativo (Ordini)</h3>
+      <p>Cliente chiama → crei ordine → consegni → spunti "consegnato". Punto.</p>
+
+      <h3>2. Flusso fiscale (DDT + Fatture)</h3>
+      <p>Quando ti serve un DDT (per le consegne che richiedono documento di trasporto cartaceo o per la fatturazione mensile):</p>
+      <ol>
+        <li>Vai in <strong>Spedizioni</strong> → <strong>+ Nuova spedizione</strong></li>
+        <li>Associa lotto + cliente + quantità + prezzo → si genera il DDT</li>
+        <li>A fine mese, in <strong>Fatturazione</strong> → tab "Da fatturare" → vedi i DDT raggruppati per cliente</li>
+        <li>Premi <strong>📄 Prepara fattura</strong> e generi PDF / XML FatturaPA / email</li>
+      </ol>
+
+      <h3>Il workflow quotidiano completo</h3>
+      <ol>
+        <li><strong>Materie prime</strong>: aggiorna scorte e lotti fornitore quando arrivano</li>
+        <li><strong>Ordini</strong>: ricevi le chiamate dei clienti e le registri</li>
+        <li><strong>Produzione &amp; Lotti</strong>: produci i lotti</li>
+        <li><strong>Etichette</strong>: 🏷️ stampi le etichette dei cartoni</li>
+        <li><strong>Ordini → ✓ consegnato</strong>: spunti le consegne effettuate</li>
+        <li><strong>Spedizioni</strong>: registri i DDT necessari (quelli accompagnatori o per fatturazione)</li>
+        <li><strong>Fatturazione</strong>: a fine mese aggreghi DDT in fatture</li>
+        <li><strong>HACCP</strong>: registri temperature ogni giorno</li>
+      </ol>
 
       <h2>💰 Listini personalizzati per cliente</h2>
       <p>Hai due livelli di prezzo:</p>
@@ -4145,7 +4642,9 @@ function renderGuida() {
         <li><strong>Ho perso i dati</strong>: importa l'ultimo backup da Sincronizzazione</li>
         <li><strong>Voglio ricominciare</strong>: Impostazioni → Cancella tutti i dati</li>
         <li><strong>Stampa non parte</strong>: usa "Salva come PDF" e stampa dal PDF</li>
-        <li><strong>Non riesco a modificare un ordine</strong>: se è in stato "Spedito" diventa read-only. Modifica direttamente il DDT collegato dalla sezione Spedizioni</li>
+        <li><strong>Ho cliccato "Consegnato" per errore</strong>: apri la scheda cliente (clic sulla sua icona) → trova l'ordine → pulsante ↶ per riportarlo in "Da consegnare"</li>
+        <li><strong>L'icona di un cliente non appare</strong>: verifica che il cliente esista in <strong>Anagrafiche → Clienti</strong>. Tutti i clienti registrati appaiono sempre (almeno nel settore "Altri")</li>
+        <li><strong>Un ordine non appare nella dashboard di oggi</strong>: verifica la data di consegna dell'ordine. Solo gli ordini con <code>data consegna = oggi</code> e stato "Da consegnare" o "Consegnato" appaiono nei settori verde/blu</li>
         <li><strong>Il prezzo nell'ordine è 0</strong>: imposta il prezzo default nel prodotto o crea uno scaglione nel listino del cliente</li>
         <li><strong>L'XML FatturaPA non viene accettato dal gestionale</strong>: verifica che P.IVA azienda, P.IVA cliente e codice destinatario siano corretti in Impostazioni e nella scheda cliente</li>
         <li><strong>EmailJS dà errore "401" o "403"</strong>: ricontrolla che Service ID, Template ID e Public Key siano copiati esattamente da emailjs.com</li>
@@ -4568,6 +5067,7 @@ if ('serviceWorker' in navigator) {
    ════════════════════════════════════════════════════════════════════ */
 loadTheme();
 loadKitchenMode();
+migrateOrdiniStati();
 render();
 
 // Save data periodically as safety
