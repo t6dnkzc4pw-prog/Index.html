@@ -1386,7 +1386,7 @@ function renderLotti() {
       <div class="form-grid">
         <div class="field">
           <label class="field-label">Cerca</label>
-          <input type="text" class="field-input" placeholder="Codice, prodotto, operatore..." 
+          <input type="text" class="field-input" placeholder="Codice, prodotto, operatore..."
             value="${escapeHtml(lottiFilter.search)}" oninput="lottiFilter.search=this.value;render()">
         </div>
         <div class="field">
@@ -1405,7 +1405,7 @@ function renderLotti() {
           <input type="date" class="field-input" value="${lottiFilter.dataA}" onchange="lottiFilter.dataA=this.value;render()">
         </div>
       </div>
-      ${(lottiFilter.search || lottiFilter.prodotto || lottiFilter.dataDa || lottiFilter.dataA) ? 
+      ${(lottiFilter.search || lottiFilter.prodotto || lottiFilter.dataDa || lottiFilter.dataA) ?
         `<div style="margin-top:12px"><button class="btn btn--ghost btn--small" onclick="lottiFilter={search:'',prodotto:'',dataDa:'',dataA:''};render()">× Cancella filtri</button></div>` : ''}
     </div>
 
@@ -1413,7 +1413,7 @@ function renderLotti() {
       <div class="card empty">
         <div class="empty-icon">🥐</div>
         <div class="empty-title">${data.lotti.length === 0 ? 'Nessun lotto ancora' : 'Nessun risultato'}</div>
-        <div class="empty-text">${data.lotti.length === 0 
+        <div class="empty-text">${data.lotti.length === 0
           ? 'Quando produci un lotto, registralo qui per generare automaticamente il codice di tracciabilità e la scadenza.'
           : 'Modifica i filtri per vedere altri risultati.'}</div>
         ${data.lotti.length === 0 ? `<button class="btn btn--amber" onclick="openLottoModal()">Registra il primo lotto</button>` : ''}
@@ -2419,7 +2419,7 @@ function renderGuida() {
       </div>
 
       <h2>📱 Installare come app sul telefono</h2>
-      
+
       <h3>iPhone (Safari)</h3>
       <ol>
         <li>Apri questa pagina in Safari (non in altri browser)</li>
@@ -2787,7 +2787,7 @@ if ('serviceWorker' in navigator) {
     self.addEventListener('fetch', e => {
       // Cache-first per la app (è single-file)
       e.respondWith(
-        caches.open('brioche-lab-v1').then(cache => 
+        caches.open('brioche-lab-v1').then(cache =>
           cache.match(e.request).then(r => r || fetch(e.request).then(resp => {
             if (e.request.url.startsWith(self.location.origin)) {
               cache.put(e.request, resp.clone());
