@@ -3914,9 +3914,9 @@ function renderGuida() {
 
     <div class="tutorial">
       <h2>🚀 Per iniziare</h2>
-      <p>L'app è organizzata in <strong>4 aree</strong>:</p>
+      <p>L'app è organizzata in <strong>3 aree</strong>:</p>
       <ul>
-        <li><strong>Operatività</strong> — Dashboard, Lotti, Spedizioni, HACCP (uso quotidiano)</li>
+        <li><strong>Operatività</strong> — Dashboard, Ordini, Lotti, Spedizioni, Fatturazione, HACCP (uso quotidiano)</li>
         <li><strong>Anagrafiche</strong> — Prodotti, Materie prime, Clienti</li>
         <li><strong>Sistema</strong> — Sincronizzazione, Guida, Impostazioni</li>
       </ul>
@@ -3924,10 +3924,17 @@ function renderGuida() {
       <div class="info-box">
         <div class="info-box-title">Setup iniziale (1 volta sola)</div>
         <ol>
-          <li>Vai su <strong>Impostazioni</strong> e inserisci <strong>ragione sociale, P. IVA, indirizzo</strong> (appaiono sulle etichette)</li>
-          <li>Personalizza i <strong>Prodotti</strong></li>
+          <li>Vai su <strong>Impostazioni</strong> e inserisci:
+            <ul>
+              <li><strong>Dati aziendali</strong>: ragione sociale, P. IVA, codice fiscale, indirizzo</li>
+              <li><strong>Dati fiscali</strong>: regime, IVA default, prefisso fattura, IBAN, PEC</li>
+              <li><strong>EmailJS</strong> (opzionale): per inviare fatture via email automaticamente</li>
+            </ul>
+          </li>
+          <li>Personalizza i <strong>Prodotti</strong> con <strong>prezzo default</strong> e aliquota IVA</li>
           <li>Aggiorna le <strong>Materie prime</strong> con i tuoi fornitori</li>
-          <li>Aggiungi i <strong>Clienti</strong> man mano che li acquisisci</li>
+          <li>Aggiungi i <strong>Clienti</strong> con P.IVA, PEC, codice destinatario SDI</li>
+          <li>Imposta i <strong>listini personalizzati</strong> per cliente (scaglioni quantità)</li>
         </ol>
       </div>
 
@@ -3953,22 +3960,118 @@ function renderGuida() {
       <h3>Desktop (Chrome / Edge)</h3>
       <p>Nella barra degli indirizzi appare un'icona <strong>"Installa"</strong> a destra. Cliccala e conferma.</p>
 
-      <h2>📋 Flusso quotidiano in laboratorio</h2>
+      <h2>📋 Flusso commerciale completo: Ordine → DDT → Fattura</h2>
+
+      <div class="info-box">
+        <div class="info-box-title">Il ciclo di vita di una commessa</div>
+        <p style="margin-bottom:0">Il cliente ordina → tu produci → spedisci con DDT → a fine mese aggreghi i DDT in fattura → segni quando viene pagata.</p>
+      </div>
 
       <h3>1. Quando ricevi materie prime</h3>
       <p>Vai su <strong>Materie prime</strong>, clicca sulla riga e aggiorna il <strong>lotto fornitore</strong> e la data di consegna.</p>
 
-      <h3>2. Quando produci un lotto</h3>
+      <h3>2. Quando un cliente ti chiama per un ordine</h3>
+      <p>Sezione <strong>Ordini</strong> &rarr; <strong>+ Nuovo ordine</strong>:</p>
+      <ul>
+        <li>Seleziona il cliente</li>
+        <li>Indica <strong>data e orario di consegna previsto</strong> (es. domani alle 07:30)</li>
+        <li>Aggiungi una o più <strong>righe</strong>: prodotto + quantità. Il prezzo unitario si compila automaticamente dal listino del cliente (modificabile)</li>
+        <li>Salva. Stato iniziale: <strong>Ricevuto</strong></li>
+      </ul>
+      <p>L'ordine è <strong>modificabile in qualsiasi momento</strong> finché non viene spedito. Quando inizi a produrlo cambia lo stato a <strong>In produzione</strong>, poi a <strong>Pronto</strong>.</p>
+
+      <h3>3. Quando produci un lotto</h3>
       <p>Sezione <strong>Produzione &amp; Lotti</strong> &rarr; <strong>+ Nuovo lotto</strong>. Compila data, turno, prodotto, quantità. Il codice lotto viene generato automaticamente.</p>
 
-      <h3>3. Quando stampi le etichette</h3>
+      <h3>4. Quando stampi le etichette del cartone</h3>
       <p>Dalla riga del lotto, tocca l'icona <strong>🏷️</strong>. Si apre l'anteprima dell'etichetta, premi <strong>Stampa</strong>.</p>
 
-      <h3>4. Quando spedisci</h3>
-      <p>Sezione <strong>Spedizioni</strong> &rarr; associa lotto + cliente + DDT.</p>
+      <h3>5. Quando spedisci l'ordine</h3>
+      <p>Hai due strade:</p>
+      <ul>
+        <li><strong>Dall'ordine</strong>: se l'ordine è in stato "Pronto", premi <strong>🚚 Spedisci</strong>. Si apre il modale DDT con cliente, quantità e prezzo già compilati. Conferma e il DDT viene creato, l'ordine passa a "Spedito".</li>
+        <li><strong>Spedizione diretta</strong>: sezione <strong>Spedizioni</strong> &rarr; <strong>+ Nuova spedizione</strong>. Associa lotto + cliente + DDT manualmente.</li>
+      </ul>
+      <p>Il <strong>prezzo unitario</strong> viene salvato sul DDT al momento della creazione (non cambia retroattivamente se modifichi il listino dopo).</p>
 
-      <h3>5. Ogni giorno (HACCP)</h3>
+      <h3>6. A fine mese: emissione fatture</h3>
+      <p>Sezione <strong>Fatturazione</strong>, tab <strong>"Da fatturare"</strong>:</p>
+      <ul>
+        <li>Vedi una card per ogni cliente con DDT non ancora fatturati</li>
+        <li>Premi <strong>📄 Prepara fattura</strong> → si apre l'anteprima con righe, imponibile, IVA, totale</li>
+        <li>Da qui puoi: <strong>🖨 Stampare PDF</strong>, scaricare <strong>📥 XML FatturaPA</strong>, inviare via <strong>📧 email</strong></li>
+        <li>Quando confermi, la fattura viene archiviata e i DDT vengono marcati "Fatturato"</li>
+      </ul>
+
+      <h3>7. Quando il cliente paga</h3>
+      <p>Tab <strong>"Emesse"</strong> della Fatturazione, oppure dalla scheda cliente → tab Fatture: premi <strong>Segna pagata</strong> e inserisci la data del pagamento.</p>
+
+      <h3>8. Ogni giorno (HACCP)</h3>
       <p>Registra le <strong>temperature</strong> di cella, abbattitore e freezer.</p>
+
+      <h2>💰 Listini personalizzati per cliente</h2>
+      <p>Hai due livelli di prezzo:</p>
+      <ol>
+        <li><strong>Prezzo default del prodotto</strong>: lo imposti in <strong>Prodotti</strong>. È quello usato se non hai personalizzato nulla per il cliente.</li>
+        <li><strong>Listino del cliente</strong>: in <strong>Clienti</strong> &rarr; apri il cliente &rarr; tab <strong>💰 Listino</strong>. Per ogni prodotto puoi creare degli <strong>scaglioni quantità</strong>.</li>
+      </ol>
+      <div class="info-box">
+        <div class="info-box-title">Esempio scaglioni</div>
+        <p>Per "Bar Centrale" sul Cornetto classico:</p>
+        <ul style="margin-top:6px;margin-bottom:0">
+          <li>≥ 1 pz → €0,45</li>
+          <li>≥ 100 pz → €0,40</li>
+          <li>≥ 500 pz → €0,35</li>
+        </ul>
+        <p style="margin-top:8px;margin-bottom:0">Se questo cliente ordina 250 cornetti, il sistema applica automaticamente €0,40/pz.</p>
+      </div>
+      <p>Quando crei un nuovo ordine, il prezzo si compila in automatico ma resta <strong>sempre modificabile</strong> caso per caso.</p>
+
+      <h2>🧾 Fatturazione: PDF, XML FatturaPA e SDI</h2>
+      <p>L'app genera <strong>3 formati</strong> di documento:</p>
+      <ul>
+        <li><strong>PDF pro-forma</strong> (🖨 Stampa): documento stampabile da mandare al cliente. Non sostituisce la fattura fiscale.</li>
+        <li><strong>XML FatturaPA</strong> (📥 XML): file conforme al tracciato dell'Agenzia delle Entrate v1.2.1.</li>
+        <li><strong>Riepilogo email</strong> (📧 Invia): se hai configurato EmailJS, l'email parte automaticamente.</li>
+      </ul>
+
+      <div class="info-box">
+        <div class="info-box-title">⚠ Importante: SDI non automatico</div>
+        <p>L'app <strong>non trasmette</strong> direttamente al Sistema di Interscambio (SDI). Per la fatturazione fiscale:</p>
+        <ol style="margin-top:6px">
+          <li>Scarica il file XML</li>
+          <li>Caricalo sul tuo gestionale fiscale (Aruba Fatturazione, FattureInCloud, ecc.) <strong>oppure</strong></li>
+          <li>Invialo al commercialista via email/cloud, lui lo trasmetterà a SDI</li>
+        </ol>
+        <p style="margin-top:8px;margin-bottom:0">È la soluzione usata da migliaia di piccole aziende: zero costi di backend, zero certificati, massima flessibilità.</p>
+      </div>
+
+      <h2>📧 Setup EmailJS (invio automatico fatture)</h2>
+      <p>Se vuoi inviare le fatture via email <strong>senza aprire ogni volta il client di posta</strong>, configura EmailJS:</p>
+      <ol>
+        <li>Vai su <a href="https://www.emailjs.com" target="_blank">emailjs.com</a> e registrati (gratis 200 email/mese)</li>
+        <li>Aggiungi un <strong>servizio email</strong> (Gmail, Outlook, Yahoo, ecc.) — segui il wizard, autorizza l'account</li>
+        <li>Crea un <strong>template</strong>. Nel campo "Content" usa queste variabili: <code>{{to_email}}</code>, <code>{{subject}}</code>, <code>{{message}}</code>, <code>{{numero_fattura}}</code>, <code>{{totale}}</code>, <code>{{mittente}}</code></li>
+        <li>Copia <strong>Service ID</strong>, <strong>Template ID</strong> e <strong>Public Key</strong> nelle Impostazioni dell'app</li>
+        <li>Premi <strong>📧 Email di test</strong> per verificare</li>
+      </ol>
+
+      <div class="info-box">
+        <div class="info-box-title">Conferma sempre prima dell'invio</div>
+        <p style="margin-bottom:0">Quando premi "Invia con EmailJS" l'app ti mostra il riepilogo dei destinatari e ti chiede conferma. Le email non partono mai senza la tua autorizzazione.</p>
+      </div>
+
+      <p>Se non configuri EmailJS, puoi sempre usare <strong>✉ Apri in app email</strong>: si apre Gmail/Mail con tutto precompilato, ti basta allegare manualmente il PDF/XML.</p>
+
+      <h2>👤 Scheda cliente (storico completo)</h2>
+      <p>Nella pagina <strong>Clienti</strong>, clicca sulla riga di un cliente per aprire la sua <strong>scheda storica</strong>. Vedrai:</p>
+      <ul>
+        <li><strong>KPI</strong>: fatturato dell'anno, DDT totali, insoluti, ultima spedizione</li>
+        <li><strong>Tab Ordini</strong>: tutti gli ordini di questo cliente</li>
+        <li><strong>Tab DDT</strong>: tutti i documenti di trasporto con quantità e importi</li>
+        <li><strong>Tab Fatture</strong>: tutte le fatture emesse con stato pagato/da pagare</li>
+        <li><strong>Tab Listino</strong>: gestisci i prezzi personalizzati e gli scaglioni</li>
+      </ul>
 
       <h2>🔄 Come sincronizzare con un collaboratore</h2>
       <p>L'app salva i dati <strong>nel tuo telefono</strong>. Per condividerli con un collaboratore:</p>
@@ -4042,6 +4145,12 @@ function renderGuida() {
         <li><strong>Ho perso i dati</strong>: importa l'ultimo backup da Sincronizzazione</li>
         <li><strong>Voglio ricominciare</strong>: Impostazioni → Cancella tutti i dati</li>
         <li><strong>Stampa non parte</strong>: usa "Salva come PDF" e stampa dal PDF</li>
+        <li><strong>Non riesco a modificare un ordine</strong>: se è in stato "Spedito" diventa read-only. Modifica direttamente il DDT collegato dalla sezione Spedizioni</li>
+        <li><strong>Il prezzo nell'ordine è 0</strong>: imposta il prezzo default nel prodotto o crea uno scaglione nel listino del cliente</li>
+        <li><strong>L'XML FatturaPA non viene accettato dal gestionale</strong>: verifica che P.IVA azienda, P.IVA cliente e codice destinatario siano corretti in Impostazioni e nella scheda cliente</li>
+        <li><strong>EmailJS dà errore "401" o "403"</strong>: ricontrolla che Service ID, Template ID e Public Key siano copiati esattamente da emailjs.com</li>
+        <li><strong>EmailJS dà errore "412 Gmail API"</strong>: il servizio Gmail su EmailJS è scaduto, riconnetti l'account dalla dashboard di EmailJS</li>
+        <li><strong>Le email partono ma il cliente non le riceve</strong>: controlla la cartella SPAM del cliente, e che il "from" del template EmailJS sia un indirizzo valido</li>
       </ul>
     </div>
   `;
