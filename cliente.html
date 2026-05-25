@@ -772,7 +772,7 @@ function buildMessaggioOrdine(ordine) {
   return msg;
 }
 
-function inviaOrdineViaWhatsApp() {
+async function inviaOrdineViaWhatsApp() {
   const catalogo = (state.payload && state.payload.catalogo) || [];
   const ids = Object.keys(state.carrello);
   if (!ids.length) { showToast('Carrello vuoto', 'error'); return; }
@@ -793,19 +793,37 @@ function inviaOrdineViaWhatsApp() {
   const ordine = {
     id: 'ord-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
     numero: 'C' + Date.now().toString(36).toUpperCase().slice(-6),
-    data: now.slice(0,10),
+    clienteId: state.clienteId || (state.payload && state.payload.clienteId) || '',
+    clienteNome: (state.payload && state.payload.cliente) || '',
+    data: now.slice(0, 10),
     dataConsegna,
     righe, note,
     totale,
-    stato: 'inviato',
+    stato: 'nuovo',
+    source: 'cliente-app',
     createdAt: now,
-    inviato: now,
+    updatedAt: now,
   };
   const tel = (state.payload && state.payload.tel || '').replace(/[^0-9]/g, '');
   if (!tel) {
     showToast('Numero del panificio mancante. Chiedi un nuovo link.', 'error', 5000);
     return;
   }
+
+  // Push real-time al fornaio via ntfy.sh (best-effort, non blocca il flusso)
+  const tenant = state.payload && state.payload.tenant;
+  if (tenant) {
+    const msg = { type: 'nuovo-ordine', ts: now, ordine };
+    const titolo = 'Nuovo ordine da ' + (ordine.clienteNome || 'cliente');
+    try {
+      fetch(`https://ntfy.sh/brioche-${tenant}`, {
+        method: 'POST',
+        body: JSON.stringify(msg),
+        headers: { 'Title': titolo, 'Tags': 'bell' }
+      }).catch(e => console.warn('ntfy POST:', e));
+    } catch(e) { console.warn('ntfy POST:', e); }
+  }
+
   const messaggio = buildMessaggioOrdine(ordine);
   const waUrl = `https://wa.me/${tel}?text=${encodeURIComponent(messaggio)}`;
   state.carrello = {};
@@ -814,7 +832,7 @@ function inviaOrdineViaWhatsApp() {
   window.open(waUrl, '_blank');
   closeCartDetail();
   renderCatalogo();
-  showToast('✓ WhatsApp aperto. Premi "Invia" per consegnare l\'ordine.', 'success', 5000);
+  showToast('✓ Ordine inviato. Conferma su WhatsApp se richiesto.', 'success', 5000);
 }
 
 // Storico ordini rimosso: il cliente non ha più la tab "I miei ordini".

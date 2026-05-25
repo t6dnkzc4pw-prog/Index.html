@@ -1236,6 +1236,8 @@ const DEFAULT_DATA = {
       regimeFiscale: 'RF01',
     },
     telefonoOrdini: '',
+    tenantId: '',
+    ntfyLastTs: 0,
     gistSync: {
       enabled: false,
       pat: '',
@@ -1278,17 +1280,24 @@ function deepMergeDefaults(defaults, override) {
 
 let dataLoadError = false;
 
+function genTenantId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, '');
+  return 't-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 14);
+}
+
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       const fresh = JSON.parse(JSON.stringify(DEFAULT_DATA));
       fresh.meta.deviceId = 'dev-' + Math.random().toString(36).slice(2, 10);
+      fresh.config.tenantId = genTenantId();
       return fresh;
     }
     const parsed = JSON.parse(raw);
     const merged = deepMergeDefaults(DEFAULT_DATA, parsed);
     if (!merged.meta.deviceId) merged.meta.deviceId = 'dev-' + Math.random().toString(36).slice(2, 10);
+    if (!merged.config.tenantId) merged.config.tenantId = genTenantId();
     return merged;
   } catch(e) {
     console.error('Errore lettura dati:', e);
@@ -1653,7 +1662,9 @@ function buildClientePayload(cliente) {
   return {
     v: 1,
     cliente: cliente.ragioneSociale || cliente.nome || 'Cliente',
+    clienteId: cliente.id,
     tel: data.config.telefonoOrdini || '',
+    tenant: data.config.tenantId || '',
     catalogo: prodottiPubblici,
     listino: Array.isArray(cliente.listino) ? cliente.listino : [],
     azienda: data.config.azienda || 'Brioche Lab',
@@ -1732,6 +1743,143 @@ function copiaLinkCliente(url) {
     document.body.removeChild(ta);
     toast('Link copiato', 'success');
   });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   NTFY.SH — sync real-time ordini cliente → fornaio
+   ════════════════════════════════════════════════════════════════════ */
+const NTFY_HOST = 'ntfy.sh';
+let ntfyWs = null;
+let ntfyReconnectTimer = null;
+
+function ntfyTopic() {
+  const t = data.config.tenantId;
+  return t ? `brioche-${t}` : '';
+}
+
+function ntfyConnect() {
+  const topic = ntfyTopic();
+  if (!topic) return;
+  if (ntfyReconnectTimer) { clearTimeout(ntfyReconnectTimer); ntfyReconnectTimer = null; }
+  try { if (ntfyWs) ntfyWs.close(); } catch(_) {}
+  const url = `wss://${NTFY_HOST}/${topic}/ws`;
+  try {
+    ntfyWs = new WebSocket(url);
+  } catch(e) {
+    console.error('ntfy WS:', e);
+    ntfyReconnectTimer = setTimeout(ntfyConnect, 10000);
+    return;
+  }
+  ntfyWs.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.event !== 'message') return;
+      const payload = JSON.parse(msg.message);
+      handleNtfyPayload(payload);
+    } catch(e) { console.error('ntfy parse:', e); }
+  };
+  ntfyWs.onclose = () => {
+    ntfyWs = null;
+    ntfyReconnectTimer = setTimeout(ntfyConnect, 5000);
+  };
+  ntfyWs.onerror = () => { try { ntfyWs.close(); } catch(_) {} };
+}
+
+async function recuperaOrdiniPersi() {
+  const topic = ntfyTopic();
+  if (!topic) return;
+  const sinceMs = data.config.ntfyLastTs || (Date.now() - 24 * 3600 * 1000);
+  const since = Math.floor(sinceMs / 1000);
+  try {
+    const r = await fetch(`https://${NTFY_HOST}/${topic}/json?poll=1&since=${since}`);
+    if (!r.ok) return;
+    const text = await r.text();
+    let recuperati = 0;
+    text.split('\n').filter(l => l.trim()).forEach(line => {
+      try {
+        const msg = JSON.parse(line);
+        if (msg.event !== 'message') return;
+        const payload = JSON.parse(msg.message);
+        if (handleNtfyPayload(payload, true)) recuperati++;
+      } catch(_) {}
+    });
+    data.config.ntfyLastTs = Date.now();
+    saveData();
+    if (recuperati > 0) toast(`${recuperati} ordin${recuperati === 1 ? 'e' : 'i'} ricevut${recuperati === 1 ? 'o' : 'i'} mentre eri assente`, 'info', 5000);
+  } catch(e) { console.error('recuperaOrdiniPersi:', e); }
+}
+
+function handleNtfyPayload(payload, isCatchup) {
+  if (!payload || payload.type !== 'nuovo-ordine' || !payload.ordine) return false;
+  const remoto = payload.ordine;
+  if (!data.ordini) data.ordini = [];
+  const esistente = data.ordini.find(o => o.id === remoto.id);
+  const isModifica = !!esistente;
+  if (esistente) {
+    if ((remoto.updatedAt || remoto.createdAt || '') <= (esistente.updatedAt || esistente.createdAt || '')) return false;
+    Object.assign(esistente, remoto);
+  } else {
+    const o = Object.assign({}, remoto, { stato: remoto.stato || 'nuovo' });
+    if (!o.numero) o.numero = remoto.numero || ('C' + (remoto.id || '').slice(-6).toUpperCase());
+    if (!o.data) o.data = (remoto.createdAt || new Date().toISOString()).slice(0, 10);
+    data.ordini.push(o);
+  }
+  data.config.ntfyLastTs = Date.now();
+  saveData();
+  const cli = (data.clienti || []).find(c => c.id === remoto.clienteId);
+  const nomeCliente = remoto.clienteNome || (cli && (cli.ragioneSociale || cli.nome)) || 'Cliente';
+  const titolo = isModifica ? 'Ordine modificato da ' + nomeCliente : 'Nuovo ordine da ' + nomeCliente;
+  const messaggio = `${(remoto.righe || []).length} prodotti · € ${fmtEur(remoto.totale || 0)} · per ${fmtDate(remoto.dataConsegna)}`;
+  addNotifica(isModifica ? 'modifica-ordine' : 'nuovo-ordine', titolo, messaggio, remoto.id);
+  if (!isCatchup) showOrdineNotification(remoto, nomeCliente, isModifica);
+  if (currentPage === 'ordini' || currentPage === 'dashboard' || currentPage === 'notifiche') render();
+  return true;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   NOTIFICHE BROWSER NATIVE
+   ════════════════════════════════════════════════════════════════════ */
+async function ensureNotificationPermission(silent) {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied') return false;
+  if (silent) return false;
+  try { return (await Notification.requestPermission()) === 'granted'; }
+  catch(_) { return false; }
+}
+
+async function attivaNotificheBrowser() {
+  const ok = await ensureNotificationPermission(false);
+  if (ok) {
+    toast('Notifiche attivate ✓', 'success');
+    // Demo immediata per conferma
+    try { new Notification('🔔 Notifiche attive', { body: 'Riceverai un avviso ad ogni nuovo ordine cliente.' }); } catch(_) {}
+  } else {
+    toast('Notifiche non attivate. Controlla le impostazioni del browser.', 'error', 5000);
+  }
+  render();
+}
+
+function showOrdineNotification(ordine, clienteNome, isModifica) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const titolo = isModifica ? `✏️ Ordine modificato da ${clienteNome}` : `🆕 Nuovo ordine da ${clienteNome}`;
+  const corpo = `${(ordine.righe || []).length} prodotti · € ${fmtEur(ordine.totale || 0)} · per ${fmtDate(ordine.dataConsegna)}`;
+  const icon = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='42' fill='#1B3A6B'/><circle cx='96' cy='96' r='70' fill='none' stroke='#E8A020' stroke-width='8'/><path d='M42 86 Q42 132 96 132 Q150 132 150 86 Q150 108 122 116 Q96 120 70 116 Q42 108 42 86' fill='#E8A020'/></svg>");
+  try {
+    const n = new Notification(titolo, {
+      body: corpo,
+      tag: 'ordine-' + ordine.id,
+      icon, badge: icon,
+      renotify: true,
+      vibrate: [200, 100, 200],
+    });
+    n.onclick = () => {
+      window.focus();
+      currentPage = 'ordini';
+      render();
+      n.close();
+    };
+  } catch(e) { console.error('notification:', e); }
 }
 
 async function restoreGistBackup(filename) {
@@ -5010,14 +5158,43 @@ function deleteHaccp(id) {
    ════════════════════════════════════════════════════════════════════ */
 function renderNotifiche() {
   const notifiche = (data.notificheInApp || []).filter(n => !n.eliminato).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  const notifSupported = 'Notification' in window;
+  const notifPerm = notifSupported ? Notification.permission : 'unsupported';
   return `
     <div class="page-header">
       <div>
         <div class="page-title">🔔 Notifiche</div>
-        <div class="page-subtitle">Nuovi ordini dai clienti e altre notifiche</div>
+        <div class="page-subtitle">Nuovi ordini dai clienti — sync in tempo reale via ntfy.sh</div>
       </div>
       ${notifiche.length ? `<button class="btn btn--ghost" onclick="markAllNotificheRead()">Segna tutte come lette</button>` : ''}
     </div>
+
+    ${notifPerm === 'default' ? `
+      <div class="banner banner--amber">
+        <div class="banner-icon">🔔</div>
+        <div class="banner-content">
+          <div class="banner-title">Attiva le notifiche per non perdere ordini</div>
+          <div>Ricevi un avviso del telefono ogni volta che un cliente invia o modifica un ordine, anche quando l'app è in background.</div>
+        </div>
+        <button class="btn btn--amber btn--small" onclick="attivaNotificheBrowser()">Attiva ora</button>
+      </div>
+    ` : notifPerm === 'denied' ? `
+      <div class="banner banner--amber">
+        <div class="banner-icon">⚠</div>
+        <div class="banner-content">
+          <div class="banner-title">Notifiche bloccate dal browser</div>
+          <div>Hai negato il permesso. Per attivarle: tasto lucchetto nella barra indirizzi → Impostazioni sito → Notifiche → Consenti.</div>
+        </div>
+      </div>
+    ` : notifPerm === 'granted' ? `
+      <div class="banner banner--green">
+        <div class="banner-icon">✓</div>
+        <div class="banner-content">
+          <div class="banner-title">Notifiche attive</div>
+          <div>Riceverai un avviso a ogni nuovo ordine dai clienti.</div>
+        </div>
+      </div>
+    ` : ''}
 
     ${notifiche.length === 0 ? `
       <div class="empty">
@@ -5982,7 +6159,6 @@ if ('serviceWorker' in navigator) {
     self.addEventListener('install', e => self.skipWaiting());
     self.addEventListener('activate', e => self.clients.claim());
     self.addEventListener('fetch', e => {
-      // Cache-first per la app (è single-file)
       e.respondWith(
         caches.open('brioche-lab-v1').then(cache =>
           cache.match(e.request).then(r => r || fetch(e.request).then(resp => {
@@ -5993,6 +6169,22 @@ if ('serviceWorker' in navigator) {
           }).catch(() => cache.match('/')))
         )
       );
+    });
+    self.addEventListener('push', e => {
+      const data = e.data ? (function(){ try { return e.data.json(); } catch(_) { return { title: e.data.text() }; } })() : {};
+      e.waitUntil(self.registration.showNotification(data.title || 'Brioche Lab', {
+        body: data.body || '',
+        tag: data.tag || 'ordine',
+        renotify: true,
+      }));
+    });
+    self.addEventListener('notificationclick', e => {
+      e.notification.close();
+      e.waitUntil(clients.matchAll({type: 'window'}).then(list => {
+        const c = list.find(x => x.url.includes('index.html')) || list[0];
+        if (c) return c.focus();
+        return clients.openWindow('./index.html');
+      }));
     });
   `;
   const swBlob = new Blob([swCode], {type: 'application/javascript'});
@@ -6027,6 +6219,14 @@ if (data.config.gistSync.enabled && data.config.gistSync.pat && data.config.gist
   setGistStatus('syncing', 'Controllo cloud...');
   gistCheckOnBoot();
 }
+
+// Sync real-time ordini cliente → fornaio via ntfy.sh (zero setup)
+saveData();   // Persiste tenantId se è stato appena generato
+recuperaOrdiniPersi().then(() => ntfyConnect());
+window.addEventListener('online', () => ntfyConnect());
+window.addEventListener('visibilitychange', () => {
+  if (!document.hidden && (!ntfyWs || ntfyWs.readyState !== 1)) ntfyConnect();
+});
 </script>
 
 </body>
