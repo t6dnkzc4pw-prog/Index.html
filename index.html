@@ -773,6 +773,41 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
 .banner-content { flex: 1; }
 .banner-title { font-weight: 700; color: var(--navy); margin-bottom: 2px; }
 
+/* ═══════ GIST SYNC BANNER ═══════ */
+.gist-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--light-bg);
+  border: 1px solid var(--grey-light);
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.gist-banner .btn { margin-left: auto; }
+.notifiche-badge {
+  display: inline-block;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 6px;
+}
+.notifica-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--grey-light);
+}
+.notifica-item.unread { background: var(--amber-bg); }
+.notifica-item .nbody { flex: 1; }
+.notifica-item .ntime { font-size: 12px; color: var(--muted); }
+
 /* ═══════ SECTION ═══════ */
 .section { margin-bottom: 32px; }
 .section-h {
@@ -1069,6 +1104,14 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         Ordini
       </div>
+      <div class="nav-item" data-page="catalogo">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        Catalogo cliente
+      </div>
+      <div class="nav-item" data-page="notifiche">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Notifiche<span id="notificheBadgeSidebar" class="notifiche-badge" style="display:none">0</span>
+      </div>
       <div class="nav-item" data-page="lotti">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><path d="M12 12v6M9 15h6"/></svg>
         Produzione &amp; Lotti
@@ -1123,7 +1166,10 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
   </aside>
 
   <!-- ═══════ MAIN ═══════ -->
-  <main class="main" id="mainContent"></main>
+  <main class="main" id="mainContent">
+    <div id="gistBanner" class="gist-banner" style="display:none"></div>
+    <div id="mainContentInner"></div>
+  </main>
 </div>
 
 <!-- Toast container -->
@@ -1187,12 +1233,30 @@ const DEFAULT_DATA = {
       pec: '',
       codiceDestinatario: '0000000',
       regimeFiscale: 'RF01',
+    },
+    gistSync: {
+      enabled: false,
+      pat: '',
+      gistId: '',
+      lastUploadAt: '',
+      lastDailyBackupAt: '',
+      autoSync: true,
+      dailyBackup: true,
+      retainDays: 30,
+    },
+    pollingOrdini: {
+      enabled: false,
+      intervalMs: 30000,
+      ultimoCheck: '',
     }
   },
+  catalogo: [],
+  notificheInApp: [],
   meta: {
     ultimaSincronizzazione: null,
     versioneApp: '1.1',
     deviceId: '',
+    ultimoOrdineConosciutoId: '',
   }
 };
 
@@ -1211,6 +1275,8 @@ function deepMergeDefaults(defaults, override) {
   return out;
 }
 
+let dataLoadError = false;
+
 function loadData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -1225,14 +1291,23 @@ function loadData() {
     return merged;
   } catch(e) {
     console.error('Errore lettura dati:', e);
+    dataLoadError = true;
+    setTimeout(() => alert('⚠ Errore di caricamento dei dati locali.\n\nI salvataggi sono stati DISABILITATI per evitare di sovrascrivere il backup esistente.\n\nApri "Sincronizzazione" per ripristinare dal cloud Gist, oppure esporta il localStorage manualmente da DevTools.'), 100);
     return JSON.parse(JSON.stringify(DEFAULT_DATA));
   }
 }
 
 function saveData() {
+  if (dataLoadError) {
+    console.warn('saveData bloccato: errore caricamento iniziale dei dati');
+    return;
+  }
   try {
     data.meta.ultimoSalvataggio = new Date().toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    if (data.config.gistSync && data.config.gistSync.enabled && data.config.gistSync.autoSync) {
+      scheduleGistUpload();
+    }
   } catch(e) {
     toast('Errore nel salvataggio: ' + e.message, 'error');
   }
@@ -1240,6 +1315,447 @@ function saveData() {
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   GITHUB GIST SYNC (cloud backup automatico)
+   ════════════════════════════════════════════════════════════════════ */
+const GIST_FILENAME = 'fornaio-data.json';
+const GIST_CATALOGO = 'catalogo.json';
+const GIST_ORDINI = 'ordini.json';
+const GIST_CLIENTI_PUB = 'clienti-pubblico.json';
+const GIST_API = 'https://api.github.com';
+
+let gistUploadTimer = null;
+let gistStatusState = { stato: 'idle', msg: '', ts: 0 };
+let dailyBackupTimer = null;
+let pollingOrdiniTimer = null;
+
+function gistHeaders(pat) {
+  return {
+    'Authorization': 'token ' + pat,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+  };
+}
+
+async function gistCreate(pat, dati) {
+  const body = {
+    description: 'Brioche Lab Pro — Backup dati',
+    public: false,
+    files: {
+      [GIST_FILENAME]: { content: JSON.stringify(dati, null, 2) }
+    }
+  };
+  const r = await fetch(GIST_API + '/gists', { method: 'POST', headers: gistHeaders(pat), body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('Creazione Gist fallita: ' + r.status + ' ' + r.statusText);
+  return r.json();
+}
+
+async function gistRead(gistId, pat) {
+  const r = await fetch(GIST_API + '/gists/' + gistId, { headers: gistHeaders(pat) });
+  if (!r.ok) throw new Error('Lettura Gist fallita: ' + r.status);
+  return r.json();
+}
+
+async function gistPatchFiles(gistId, pat, files) {
+  const r = await fetch(GIST_API + '/gists/' + gistId, { method: 'PATCH', headers: gistHeaders(pat), body: JSON.stringify({ files }) });
+  if (!r.ok) throw new Error('Aggiornamento Gist fallito: ' + r.status);
+  return r.json();
+}
+
+async function gistUploadDati() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
+  setGistStatus('syncing', 'Sincronizzazione in corso...');
+  try {
+    await gistPatchFiles(cfg.gistId, cfg.pat, {
+      [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) }
+    });
+    cfg.lastUploadAt = new Date().toISOString();
+    data.meta.ultimaSincronizzazione = cfg.lastUploadAt;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    setGistStatus('synced', 'Sincronizzato');
+    if (data.catalogo && data.catalogo.length) gistUploadCatalogoOrdiniClienti();
+  } catch(e) {
+    console.error('gistUploadDati:', e);
+    setGistStatus('error', e.message);
+  }
+}
+
+async function gistUploadCatalogoOrdiniClienti() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
+  try {
+    const ordiniPubblici = (data.ordini || []).map(o => ({
+      id: o.id, numero: o.numero, clienteId: o.clienteId, data: o.data, dataConsegna: o.dataConsegna,
+      righe: o.righe, note: o.note, stato: o.stato, totale: o.totale, source: o.source || 'fornaio',
+      createdAt: o.createdAt, updatedAt: o.updatedAt
+    }));
+    const clientiPub = (data.clienti || []).map(c => ({ id: c.id, nome: c.nome, ragioneSociale: c.ragioneSociale }));
+    await gistPatchFiles(cfg.gistId, cfg.pat, {
+      [GIST_CATALOGO]: { content: JSON.stringify(data.catalogo || [], null, 2) },
+      [GIST_ORDINI]: { content: JSON.stringify(ordiniPubblici, null, 2) },
+      [GIST_CLIENTI_PUB]: { content: JSON.stringify(clientiPub, null, 2) },
+    });
+  } catch(e) {
+    console.error('gistUploadCatalogoOrdiniClienti:', e);
+  }
+}
+
+function scheduleGistUpload() {
+  if (gistUploadTimer) clearTimeout(gistUploadTimer);
+  setGistStatus('pending', 'In attesa di sync...');
+  gistUploadTimer = setTimeout(gistUploadDati, 30000);
+}
+
+function setGistStatus(stato, msg) {
+  gistStatusState = { stato, msg, ts: Date.now() };
+  updateGistBanner();
+}
+
+function gistStatusLabel() {
+  const s = gistStatusState.stato;
+  if (s === 'synced') {
+    const cfg = data.config.gistSync;
+    if (!cfg.lastUploadAt) return '✓ Sincronizzato';
+    const diff = Date.now() - new Date(cfg.lastUploadAt).getTime();
+    const min = Math.floor(diff / 60000);
+    if (min < 1) return '✓ Sincronizzato ora';
+    if (min < 60) return `✓ Sincronizzato ${min} min fa`;
+    const h = Math.floor(min / 60);
+    return `✓ Sincronizzato ${h}h fa`;
+  }
+  if (s === 'syncing') return '🔄 Sincronizzazione...';
+  if (s === 'pending') return '⏳ In attesa di sync';
+  if (s === 'error') return '❌ ' + (gistStatusState.msg || 'Errore sync');
+  if (s === 'offline') return '🟠 Offline';
+  return '';
+}
+
+function updateGistBanner() {
+  const el = document.getElementById('gistBanner');
+  if (!el) return;
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  const label = gistStatusLabel();
+  const colorMap = { synced: 'var(--green)', syncing: 'var(--amber)', pending: 'var(--amber)', error: 'var(--red)', offline: 'var(--amber)', idle: 'var(--muted)' };
+  const color = colorMap[gistStatusState.stato] || 'var(--muted)';
+  el.innerHTML = `
+    <span style="color:${color};font-weight:600">${escapeHtml(label)}</span>
+    <span style="color:var(--muted);font-size:12px">· GitHub Gist</span>
+    <button class="btn btn--ghost btn--small" style="margin-left:auto" onclick="gistManualSync()">Sync ora</button>
+  `;
+}
+
+async function gistManualSync() {
+  if (gistUploadTimer) { clearTimeout(gistUploadTimer); gistUploadTimer = null; }
+  await gistUploadDati();
+}
+
+async function gistCheckOnBoot() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
+  try {
+    const gist = await gistRead(cfg.gistId, cfg.pat);
+    const file = gist.files[GIST_FILENAME];
+    if (!file || !file.content) {
+      setGistStatus('synced', '');
+      return;
+    }
+    const cloudData = JSON.parse(file.content);
+    const cloudTs = cloudData.meta?.ultimoSalvataggio || cloudData.config?.gistSync?.lastUploadAt || gist.updated_at;
+    const localTs = data.meta.ultimoSalvataggio || '';
+    if (cloudTs && (!localTs || new Date(cloudTs).getTime() > new Date(localTs).getTime() + 5000)) {
+      const cloudDate = new Date(cloudTs);
+      const ok = confirm(`I dati sul cloud sono più recenti.\n\n• Cloud: ${cloudDate.toLocaleString('it-IT')}\n• Locale: ${localTs ? new Date(localTs).toLocaleString('it-IT') : 'Mai'}\n\nVuoi ripristinare i dati dal cloud?\n\n(I tuoi dati locali verranno sostituiti.)`);
+      if (ok) {
+        data = deepMergeDefaults(DEFAULT_DATA, cloudData);
+        if (!data.config.gistSync.pat) data.config.gistSync.pat = cfg.pat;
+        if (!data.config.gistSync.gistId) data.config.gistSync.gistId = cfg.gistId;
+        data.config.gistSync.enabled = true;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        setGistStatus('synced', '');
+        render();
+        toast('Dati ripristinati dal cloud', 'success');
+      } else {
+        setGistStatus('synced', '');
+      }
+    } else {
+      setGistStatus('synced', '');
+    }
+    scheduleDailyBackupCatchup();
+  } catch(e) {
+    console.error('gistCheckOnBoot:', e);
+    setGistStatus('error', e.message);
+  }
+}
+
+async function gistConnect(pat) {
+  if (!pat || !pat.trim()) { toast('Inserisci il PAT GitHub', 'error'); return; }
+  pat = pat.trim();
+  try {
+    setGistStatus('syncing', 'Connessione in corso...');
+    const cfg = data.config.gistSync;
+    let gistId = cfg.gistId;
+    if (gistId) {
+      try {
+        await gistRead(gistId, pat);
+      } catch(e) {
+        gistId = '';
+      }
+    }
+    if (!gistId) {
+      const created = await gistCreate(pat, data);
+      gistId = created.id;
+    } else {
+      await gistPatchFiles(gistId, pat, { [GIST_FILENAME]: { content: JSON.stringify(data, null, 2) } });
+    }
+    data.config.gistSync.pat = pat;
+    data.config.gistSync.gistId = gistId;
+    data.config.gistSync.enabled = true;
+    data.config.gistSync.lastUploadAt = new Date().toISOString();
+    saveData();
+    setGistStatus('synced', '');
+    toast('✓ Connesso a GitHub Gist', 'success');
+    scheduleDailyBackup();
+    render();
+  } catch(e) {
+    console.error('gistConnect:', e);
+    setGistStatus('error', e.message);
+    toast('Errore connessione: ' + e.message, 'error');
+  }
+}
+
+function gistDisconnect() {
+  if (!confirm('Disconnettere il sync GitHub Gist?\n\nIl Gist non verrà cancellato (puoi farlo manualmente su gist.github.com).\nI dati locali restano intatti.')) return;
+  data.config.gistSync.enabled = false;
+  data.config.gistSync.pat = '';
+  if (gistUploadTimer) { clearTimeout(gistUploadTimer); gistUploadTimer = null; }
+  if (dailyBackupTimer) { clearTimeout(dailyBackupTimer); dailyBackupTimer = null; }
+  saveData();
+  setGistStatus('idle', '');
+  toast('Disconnesso da GitHub Gist', 'success');
+  render();
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   BACKUP GIORNALIERO AUTOMATICO
+   ════════════════════════════════════════════════════════════════════ */
+function msToNextMidnight() {
+  const now = new Date();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  return tomorrow.getTime() - now.getTime();
+}
+
+function scheduleDailyBackup() {
+  if (dailyBackupTimer) { clearTimeout(dailyBackupTimer); dailyBackupTimer = null; }
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.dailyBackup) return;
+  const ms = msToNextMidnight();
+  dailyBackupTimer = setTimeout(async () => {
+    await doDailyBackup();
+    scheduleDailyBackup();
+  }, ms);
+}
+
+function scheduleDailyBackupCatchup() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.dailyBackup) return;
+  const last = cfg.lastDailyBackupAt;
+  if (!last) {
+    doDailyBackup();
+  } else {
+    const diff = Date.now() - new Date(last).getTime();
+    if (diff > 24 * 3600 * 1000) doDailyBackup();
+  }
+  scheduleDailyBackup();
+}
+
+async function doDailyBackup() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
+  try {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const filename = `backup-${yyyy}-${mm}-${dd}.json`;
+    const files = { [filename]: { content: JSON.stringify(data, null, 2) } };
+    const gist = await gistRead(cfg.gistId, cfg.pat);
+    const backupFiles = Object.keys(gist.files).filter(n => /^backup-\d{4}-\d{2}-\d{2}\.json$/.test(n));
+    backupFiles.sort();
+    const retain = cfg.retainDays || 30;
+    if (backupFiles.length >= retain) {
+      const toDelete = backupFiles.slice(0, backupFiles.length - retain + 1);
+      for (const fn of toDelete) {
+        if (fn === filename) continue;
+        files[fn] = null;
+      }
+    }
+    await gistPatchFiles(cfg.gistId, cfg.pat, files);
+    cfg.lastDailyBackupAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    toast('Backup giornaliero creato: ' + filename, 'success');
+    if (document.querySelector('[data-page="sync"].active')) render();
+  } catch(e) {
+    console.error('doDailyBackup:', e);
+    toast('Backup giornaliero fallito: ' + e.message, 'error');
+  }
+}
+
+async function listGistBackups() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return [];
+  try {
+    const gist = await gistRead(cfg.gistId, cfg.pat);
+    return Object.keys(gist.files).filter(n => /^backup-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort().reverse();
+  } catch(e) {
+    console.error('listGistBackups:', e);
+    return [];
+  }
+}
+
+function generaLinkCliente(clienteId) {
+  const cliente = data.clienti.find(c => c.id === clienteId);
+  if (!cliente) { toast('Cliente non trovato', 'error'); return; }
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) {
+    showModal({
+      title: 'Configura prima il sync',
+      body: `
+        <p>Per generare un link cliente devi prima configurare il sync GitHub Gist nella sezione <strong>Sincronizzazione</strong>.</p>
+        <p style="margin-top:12px;color:var(--muted);font-size:13px">Il link cliente usa il Gist per condividere catalogo e ricevere gli ordini.</p>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
+          <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
+          <button class="btn btn--amber" onclick="closeModal();navigateTo('sync')">Vai a Sincronizzazione</button>
+        </div>
+      `
+    });
+    return;
+  }
+  if (!data.catalogo || data.catalogo.length === 0) {
+    if (!confirm('Il catalogo è vuoto. Il cliente non potrà fare ordini.\n\nVuoi generare il link comunque?')) return;
+  }
+  gistUploadCatalogoOrdiniClienti();
+  const base = window.location.href.replace(/\/index\.html.*$/, '').replace(/\/$/, '');
+  const url = `${base}/cliente.html?id=${clienteId}&k=${encodeURIComponent(cfg.pat)}&g=${cfg.gistId}`;
+  const whatsappText = encodeURIComponent(`Ciao ${cliente.ragioneSociale || cliente.nome || ''}, ecco il link per fare i tuoi ordini in autonomia:\n\n${url}\n\nTi consiglio di aggiungere l'app alla home del telefono per averla sempre a portata di mano!`);
+  const whatsappUrl = cliente.telefono ? `https://wa.me/${cliente.telefono.replace(/[^0-9]/g, '')}?text=${whatsappText}` : `https://wa.me/?text=${whatsappText}`;
+  showModal({
+    title: '🔗 Link app cliente · ' + (cliente.ragioneSociale || cliente.nome || ''),
+    body: `
+      <p style="color:var(--muted);font-size:14px;margin-bottom:12px">
+        Questo link permette al cliente di accedere alla sua app personalizzata.<br>
+        Una volta aperto, il cliente può <strong>aggiungerla alla home</strong> del telefono come un'app normale.
+      </p>
+      <div style="background:var(--light-bg);padding:12px;border-radius:8px;margin-bottom:16px;word-break:break-all;font-family:monospace;font-size:12px;max-height:120px;overflow:auto">
+        ${escapeHtml(url)}
+      </div>
+      <div class="banner banner--amber" style="margin-bottom:16px">
+        <div class="banner-icon">⚠</div>
+        <div class="banner-content">
+          <div class="banner-title">Importante</div>
+          <div>Il link contiene una credenziale di accesso al tuo Gist. Inviarlo SOLO al cliente diretto, non a terzi.</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn--amber" onclick="copiaLinkCliente('${escapeHtml(url).replace(/'/g, "&#39;")}')" style="flex:1;justify-content:center">📋 Copia link</button>
+        <a class="btn btn--amber" href="${whatsappUrl}" target="_blank" style="flex:1;justify-content:center;text-decoration:none">💬 Invia con WhatsApp</a>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
+      </div>
+    `
+  });
+}
+
+function copiaLinkCliente(url) {
+  url = url.replace(/&#39;/g, "'");
+  navigator.clipboard.writeText(url).then(() => toast('Link copiato negli appunti', 'success')).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Link copiato', 'success');
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   POLLING ORDINI DAI CLIENTI (notifiche in-app)
+   ════════════════════════════════════════════════════════════════════ */
+async function pollOrdiniClienti() {
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
+  try {
+    const gist = await gistRead(cfg.gistId, cfg.pat);
+    const file = gist.files[GIST_ORDINI];
+    if (!file || !file.content) return;
+    const ordiniRemoti = JSON.parse(file.content);
+    if (!Array.isArray(ordiniRemoti)) return;
+    let cambiamenti = false;
+    for (const remoto of ordiniRemoti) {
+      if (remoto.source !== 'cliente-app') continue;
+      const locale = (data.ordini || []).find(o => o.id === remoto.id);
+      if (!locale) {
+        data.ordini = data.ordini || [];
+        data.ordini.push(remoto);
+        const cli = data.clienti.find(c => c.id === remoto.clienteId);
+        const nomeCliente = cli ? (cli.ragioneSociale || cli.nome) : 'Cliente';
+        addNotifica('nuovo-ordine', 'Nuovo ordine da ' + nomeCliente, `Ordine per ${fmtDate(remoto.dataConsegna)} · ${(remoto.righe || []).length} prodotti · € ${fmtEur(remoto.totale || 0)}`, remoto.id);
+        cambiamenti = true;
+      } else if ((remoto.updatedAt || '') > (locale.updatedAt || '')) {
+        Object.assign(locale, remoto);
+        const cli = data.clienti.find(c => c.id === remoto.clienteId);
+        const nomeCliente = cli ? (cli.ragioneSociale || cli.nome) : 'Cliente';
+        addNotifica('modifica-ordine', 'Ordine modificato da ' + nomeCliente, `Ordine #${remoto.numero || remoto.id.slice(-6)} aggiornato`, remoto.id);
+        cambiamenti = true;
+      }
+    }
+    if (cambiamenti) {
+      data.config.pollingOrdini.ultimoCheck = new Date().toISOString();
+      saveData();
+      if (currentPage === 'ordini' || currentPage === 'dashboard' || currentPage === 'notifiche') render();
+    }
+  } catch(e) {
+    console.error('pollOrdiniClienti:', e);
+  }
+}
+
+function startPollingOrdini() {
+  if (pollingOrdiniTimer) clearInterval(pollingOrdiniTimer);
+  if (!data.config.gistSync.enabled) return;
+  pollingOrdiniTimer = setInterval(pollOrdiniClienti, 30000);
+  setTimeout(pollOrdiniClienti, 2000);
+}
+
+async function restoreGistBackup(filename) {
+  if (!confirm(`Ripristinare i dati dallo snapshot "${filename}"?\n\n⚠ I dati attuali verranno SOVRASCRITTI.\n\nUn backup di sicurezza dello stato attuale verrà creato prima.`)) return;
+  const cfg = data.config.gistSync;
+  try {
+    setGistStatus('syncing', 'Ripristino in corso...');
+    const safetyName = `pre-restore-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    await gistPatchFiles(cfg.gistId, cfg.pat, { [safetyName]: { content: JSON.stringify(data, null, 2) } });
+    const gist = await gistRead(cfg.gistId, cfg.pat);
+    const file = gist.files[filename];
+    if (!file || !file.content) throw new Error('Backup non trovato');
+    const restored = JSON.parse(file.content);
+    data = deepMergeDefaults(DEFAULT_DATA, restored);
+    if (!data.config.gistSync.pat) data.config.gistSync.pat = cfg.pat;
+    if (!data.config.gistSync.gistId) data.config.gistSync.gistId = cfg.gistId;
+    data.config.gistSync.enabled = true;
+    saveData();
+    setGistStatus('synced', '');
+    toast(`Dati ripristinati da ${filename}`, 'success', 5000);
+    render();
+  } catch(e) {
+    console.error('restoreGistBackup:', e);
+    setGistStatus('error', e.message);
+    toast('Ripristino fallito: ' + e.message, 'error');
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1370,9 +1886,10 @@ function generateFatturaNumero() {
 }
 
 const ORDINE_STATI = [
-  { value: 'programmato', label: 'Da consegnare', pill: 'pill pill--blue' },
-  { value: 'consegnato',  label: 'Consegnato',    pill: 'pill pill--green' },
-  { value: 'annullato',   label: 'Annullato',     pill: 'pill pill--red' },
+  { value: 'nuovo',       label: 'Nuovo (da confermare)', pill: 'pill pill--amber' },
+  { value: 'programmato', label: 'Confermato',            pill: 'pill pill--blue' },
+  { value: 'consegnato',  label: 'Consegnato',            pill: 'pill pill--green' },
+  { value: 'annullato',   label: 'Annullato',             pill: 'pill pill--red' },
 ];
 
 function migrateOrdiniStati() {
@@ -1487,7 +2004,7 @@ function apriCliente(id) {
 }
 
 function render() {
-  const main = document.getElementById('mainContent');
+  const main = document.getElementById('mainContentInner') || document.getElementById('mainContent');
   switch (currentPage) {
     case 'dashboard': main.innerHTML = renderDashboard(); break;
     case 'lotti': main.innerHTML = renderLotti(); break;
@@ -1502,6 +2019,13 @@ function render() {
     case 'guida': main.innerHTML = renderGuida(); break;
     case 'sync': main.innerHTML = renderSync(); break;
     case 'dati': main.innerHTML = renderDati(); break;
+    case 'catalogo': main.innerHTML = renderCatalogo(); break;
+    case 'notifiche': main.innerHTML = renderNotifiche(); break;
+  }
+  updateGistBanner();
+  updateNotificheBadge();
+  if (currentPage === 'sync' && data.config.gistSync.enabled) {
+    setTimeout(refreshBackupList, 100);
   }
 }
 
@@ -1612,6 +2136,7 @@ function renderDashboard() {
                     <td>${statoOrdinePill(o.stato)}</td>
                     <td>
                       <div class="table-actions">
+                        ${o.stato === 'nuovo' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();confermaNuovoOrdine('${o.id}')">✓ Conferma</button>` : ''}
                         ${o.stato === 'programmato' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();segnaConsegnato('${o.id}')">✓ Consegnato</button>` : ''}
                       </div>
                     </td>
@@ -2294,6 +2819,7 @@ function renderClienti() {
                   <div class="table-actions">
                     <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();apriCliente('${c.id}')">Apri</button>
                     <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openClienteModal('${c.id}')">Mod.</button>
+                    <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();generaLinkCliente('${c.id}')" title="Genera link app cliente">🔗</button>
                     <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteCliente('${c.id}')">×</button>
                   </div>
                 </td>
@@ -2814,6 +3340,7 @@ function righeOrdineTabellaHTML(ordini, mostraData) {
         <td>${statoOrdinePill(o.stato)}</td>
         <td>
           <div class="table-actions">
+            ${o.stato === 'nuovo' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();confermaNuovoOrdine('${o.id}')" title="Conferma">✓</button>` : ''}
             ${o.stato === 'programmato' ? `<button class="btn btn--amber btn--small" onclick="event.stopPropagation();segnaConsegnato('${o.id}')" title="Segna consegnato">✓</button>` : ''}
             <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openOrdineModal('${o.id}')">Mod.</button>
             <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteOrdine('${o.id}')">×</button>
@@ -2996,6 +3523,7 @@ function apriSchedaOrdineCliente(clienteId) {
             ${o.note ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;font-style:italic">${escapeHtml(o.note)}</div>` : ''}
           </div>
           <div class="table-actions" style="flex-shrink:0">
+            ${o.stato === 'nuovo' ? `<button class="btn btn--amber btn--small" onclick="confermaNuovoOrdine('${o.id}')">✓ Conferma</button>` : ''}
             ${o.stato === 'programmato' && mostraConsegna ? `<button class="btn btn--amber btn--small" onclick="segnaConsegnato('${o.id}')">✓ Consegnato</button>` : ''}
             ${o.stato === 'consegnato' ? `<button class="btn btn--ghost btn--small" onclick="riapriOrdine('${o.id}')" title="Annulla consegna">↶</button>` : ''}
             <button class="btn btn--ghost btn--small" onclick="openOrdineModal('${o.id}')">Mod.</button>
@@ -3054,6 +3582,19 @@ function apriSchedaOrdineCliente(clienteId) {
   });
 }
 
+function confermaNuovoOrdine(ordineId) {
+  const o = data.ordini.find(x => x.id === ordineId);
+  if (!o) return;
+  o.stato = 'programmato';
+  o.confermatoAt = new Date().toISOString();
+  o.updatedAt = new Date().toISOString();
+  saveData();
+  gistUploadCatalogoOrdiniClienti();
+  render();
+  const cliente = data.clienti.find(c => c.id === o.clienteId);
+  toast(`✓ Ordine confermato per ${cliente?.ragioneSociale || 'cliente'}`);
+}
+
 function segnaConsegnato(ordineId) {
   const o = data.ordini.find(x => x.id === ordineId);
   if (!o) return;
@@ -3088,8 +3629,10 @@ function confermaConsegnato(ordineId) {
   const nota = form ? form.querySelector('[name="nota"]').value : '';
   o.stato = 'consegnato';
   o.consegnatoAt = new Date().toISOString();
+  o.updatedAt = new Date().toISOString();
   o.noteConsegna = (nota || '').trim();
   saveData();
+  gistUploadCatalogoOrdiniClienti();
   closeModal();
   render();
   const cliente = data.clienti.find(c => c.id === o.clienteId);
@@ -3103,7 +3646,9 @@ function riapriOrdine(ordineId) {
   o.stato = 'programmato';
   o.consegnatoAt = null;
   o.noteConsegna = '';
+  o.updatedAt = new Date().toISOString();
   saveData();
+  gistUploadCatalogoOrdiniClienti();
   closeModal();
   render();
   toast('Ordine riportato in "Da consegnare"', 'info');
@@ -4354,53 +4899,295 @@ function deleteHaccp(id) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   PAGE: CATALOGO CLIENTE
+   ════════════════════════════════════════════════════════════════════ */
+function renderCatalogo() {
+  const catalogo = data.catalogo || [];
+  const gistConnesso = data.config.gistSync.enabled;
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">Catalogo cliente</div>
+        <div class="page-subtitle">Prodotti che i clienti vedono dall'app di ordine</div>
+      </div>
+      <button class="btn btn--amber" onclick="openCatalogoModal('')">+ Nuovo prodotto</button>
+    </div>
+
+    ${!gistConnesso ? `
+      <div class="banner banner--amber">
+        <div class="banner-icon">⚠</div>
+        <div class="banner-content">
+          <div class="banner-title">Sync GitHub Gist non configurato</div>
+          <div>Il catalogo viene pubblicato sul cloud tramite GitHub Gist. Configura il sync nella sezione <strong>Sincronizzazione</strong> per renderlo visibile ai clienti.</div>
+        </div>
+      </div>
+    ` : ''}
+
+    ${catalogo.length === 0 ? `
+      <div class="empty">
+        <div class="empty-icon">📋</div>
+        <div class="empty-text">Nessun prodotto a catalogo</div>
+        <div class="empty-hint">Aggiungi i prodotti che vuoi rendere ordinabili dai tuoi clienti</div>
+      </div>
+    ` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
+        ${catalogo.map(p => `
+          <div class="card" style="position:relative">
+            ${p.attivo === false ? '<div style="position:absolute;top:8px;right:8px;background:var(--grey-light);color:var(--muted);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">DISATTIVATO</div>' : ''}
+            ${p.immagine ? `<img src="${escapeHtml(p.immagine)}" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px" onerror="this.style.display='none'">` : ''}
+            <div style="font-weight:700;font-size:16px;margin-bottom:4px">${escapeHtml(p.nome)}</div>
+            <div style="color:var(--amber);font-weight:700;font-size:18px">€ ${fmtEur(p.prezzo)}</div>
+            ${p.descrizione ? `<div style="color:var(--muted);font-size:13px;margin-top:8px;line-height:1.4">${escapeHtml(p.descrizione)}</div>` : ''}
+            <div style="display:flex;gap:6px;margin-top:12px">
+              <button class="btn btn--ghost btn--small" onclick="openCatalogoModal('${p.id}')" style="flex:1">Modifica</button>
+              <button class="btn btn--ghost btn--small" onclick="deleteCatalogoProdotto('${p.id}')" style="color:var(--red)">Elimina</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+function openCatalogoModal(id) {
+  const p = (data.catalogo || []).find(x => x.id === id) || { id: '', nome: '', prezzo: 0, descrizione: '', immagine: '', attivo: true };
+  showModal({
+    title: id ? 'Modifica prodotto' : 'Nuovo prodotto a catalogo',
+    body: `
+      <form id="catalogoForm">
+        <div class="form-grid">
+          <div class="field" style="grid-column:span 2">
+            <label class="field-label">Nome prodotto *</label>
+            <input type="text" class="field-input" name="nome" value="${escapeHtml(p.nome)}" required>
+          </div>
+          <div class="field">
+            <label class="field-label">Prezzo (€) *</label>
+            <input type="number" class="field-input" name="prezzo" value="${p.prezzo}" step="0.01" min="0" required>
+          </div>
+          <div class="field">
+            <label class="field-label">Disponibile</label>
+            <select class="field-input" name="attivo">
+              <option value="true" ${p.attivo !== false ? 'selected' : ''}>Sì, visibile ai clienti</option>
+              <option value="false" ${p.attivo === false ? 'selected' : ''}>No, nascosto</option>
+            </select>
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label class="field-label">Immagine (URL)</label>
+            <input type="url" class="field-input" name="immagine" value="${escapeHtml(p.immagine || '')}" placeholder="https://...">
+          </div>
+          <div class="field" style="grid-column:span 2">
+            <label class="field-label">Descrizione</label>
+            <textarea class="field-input" name="descrizione" rows="3" placeholder="Breve descrizione del prodotto">${escapeHtml(p.descrizione || '')}</textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+          <button type="button" class="btn btn--ghost" onclick="closeModal()">Annulla</button>
+          <button type="submit" class="btn btn--amber">Salva</button>
+        </div>
+      </form>
+    `
+  });
+  document.getElementById('catalogoForm').onsubmit = (e) => {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const prod = {
+      id: id || ('cat-' + uid()),
+      nome: f.get('nome'),
+      prezzo: parseFloat(f.get('prezzo')) || 0,
+      descrizione: f.get('descrizione') || '',
+      immagine: f.get('immagine') || '',
+      attivo: f.get('attivo') === 'true',
+    };
+    if (!data.catalogo) data.catalogo = [];
+    if (id) {
+      const idx = data.catalogo.findIndex(x => x.id === id);
+      if (idx >= 0) data.catalogo[idx] = prod;
+    } else {
+      data.catalogo.push(prod);
+    }
+    saveData();
+    gistUploadCatalogoOrdiniClienti();
+    closeModal();
+    render();
+    toast(id ? 'Prodotto aggiornato' : 'Prodotto aggiunto al catalogo', 'success');
+  };
+}
+
+function deleteCatalogoProdotto(id) {
+  if (!confirm('Eliminare questo prodotto dal catalogo?')) return;
+  data.catalogo = (data.catalogo || []).filter(p => p.id !== id);
+  saveData();
+  gistUploadCatalogoOrdiniClienti();
+  render();
+  toast('Prodotto eliminato', 'info');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PAGE: NOTIFICHE IN-APP
+   ════════════════════════════════════════════════════════════════════ */
+function renderNotifiche() {
+  const notifiche = (data.notificheInApp || []).filter(n => !n.eliminato).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+  return `
+    <div class="page-header">
+      <div>
+        <div class="page-title">🔔 Notifiche</div>
+        <div class="page-subtitle">Nuovi ordini dai clienti e altre notifiche</div>
+      </div>
+      ${notifiche.length ? `<button class="btn btn--ghost" onclick="markAllNotificheRead()">Segna tutte come lette</button>` : ''}
+    </div>
+
+    ${notifiche.length === 0 ? `
+      <div class="empty">
+        <div class="empty-icon">🔔</div>
+        <div class="empty-text">Nessuna notifica</div>
+        <div class="empty-hint">Quando un cliente invia un nuovo ordine dall'app, comparirà qui</div>
+      </div>
+    ` : `
+      <div class="card" style="padding:0;overflow:hidden">
+        ${notifiche.map(n => `
+          <div class="notifica-item ${n.lettoIl ? '' : 'unread'}">
+            <div style="font-size:24px">${n.tipo === 'nuovo-ordine' ? '🆕' : n.tipo === 'modifica-ordine' ? '✏️' : '📌'}</div>
+            <div class="nbody">
+              <div style="font-weight:600">${escapeHtml(n.titolo || 'Notifica')}</div>
+              <div style="color:var(--muted);font-size:13px;margin-top:4px">${escapeHtml(n.messaggio || '')}</div>
+              <div class="ntime">${n.createdAt ? fmtDateTime(n.createdAt) : ''}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              ${n.ordineId ? `<button class="btn btn--ghost btn--small" onclick="apriOrdineNotifica('${n.ordineId}')">Apri ordine</button>` : ''}
+              ${!n.lettoIl ? `<button class="btn btn--ghost btn--small" onclick="markNotificaRead('${n.id}')">Letta</button>` : ''}
+              <button class="btn btn--ghost btn--small" onclick="deleteNotifica('${n.id}')" style="color:var(--red)">Elimina</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    `}
+  `;
+}
+
+function updateNotificheBadge() {
+  const badge = document.getElementById('notificheBadgeSidebar');
+  if (!badge) return;
+  const count = (data.notificheInApp || []).filter(n => !n.eliminato && !n.lettoIl).length;
+  if (count > 0) {
+    badge.style.display = '';
+    badge.textContent = count > 99 ? '99+' : count;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function addNotifica(tipo, titolo, messaggio, ordineId) {
+  if (!data.notificheInApp) data.notificheInApp = [];
+  const n = {
+    id: 'not-' + uid(),
+    tipo, titolo, messaggio, ordineId,
+    lettoIl: '',
+    eliminato: false,
+    createdAt: new Date().toISOString(),
+  };
+  data.notificheInApp.unshift(n);
+  if (data.notificheInApp.length > 200) data.notificheInApp = data.notificheInApp.slice(0, 200);
+  saveData();
+  updateNotificheBadge();
+  toast('🔔 ' + titolo, 'info', 4000);
+  try {
+    const audio = new Audio('data:audio/wav;base64,UklGRl4EAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YToEAAB/f39/f39/f39/f39/f39/f3+AgICAgIB/gICAgYGBgIB/foB/foB/foB+gH+Af3+AgICAgICAgIB+gIGCgYB+f4F/f3+AgX9/gIB/gIGAfn+CgX5+goJ/foCBf36AgYCAfoCBf3+CgH99gYJ+e3+EgXt9hIJ7eoSDfHmAhYB6gISAfH+Df36BgoB+gYJ/f4GBgIB/gIB/');
+    audio.volume = 0.3;
+    audio.play().catch(() => {});
+  } catch(_) {}
+}
+
+function markNotificaRead(id) {
+  const n = (data.notificheInApp || []).find(x => x.id === id);
+  if (n) {
+    n.lettoIl = new Date().toISOString();
+    saveData();
+    render();
+  }
+}
+
+function markAllNotificheRead() {
+  (data.notificheInApp || []).forEach(n => { if (!n.lettoIl) n.lettoIl = new Date().toISOString(); });
+  saveData();
+  render();
+}
+
+function deleteNotifica(id) {
+  const n = (data.notificheInApp || []).find(x => x.id === id);
+  if (n) { n.eliminato = true; saveData(); render(); }
+}
+
+function apriOrdineNotifica(ordineId) {
+  const n = (data.notificheInApp || []).find(x => x.ordineId === ordineId && !x.lettoIl);
+  if (n) { n.lettoIl = new Date().toISOString(); saveData(); }
+  navigateTo('ordini');
+}
+
+/* ════════════════════════════════════════════════════════════════════
    PAGE: SYNC (sincronizzazione cloud)
    ════════════════════════════════════════════════════════════════════ */
 function renderSync() {
-  const ultimaSync = data.meta.ultimaSincronizzazione;
   const deviceId = data.meta.deviceId || 'non impostato';
+  const cfg = data.config.gistSync;
+  const isConnected = cfg.enabled && cfg.gistId && cfg.pat;
   return `
     <div class="page-header">
       <div>
         <div class="page-title">Sincronizzazione</div>
-        <div class="page-subtitle">Condividi i dati con i collaboratori tramite cloud</div>
+        <div class="page-subtitle">Backup automatico nel cloud e gestione clienti via GitHub Gist</div>
       </div>
     </div>
 
-    <div class="banner banner--green">
-      <div class="banner-icon">✓</div>
-      <div class="banner-content">
-        <div class="banner-title">Come funziona la sincronizzazione</div>
-        <div>Esporta il backup su <strong>Google Drive / Dropbox / OneDrive</strong> condiviso. Gli altri utenti importano il file dall'app del cloud. Tutti vedono gli stessi dati con un piccolo ritardo manuale.</div>
-      </div>
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-h">🔗 Sync GitHub Gist ${isConnected ? '<span style="color:var(--green);font-size:14px;font-weight:600">· Attivo</span>' : '<span style="color:var(--muted);font-size:14px">· Non configurato</span>'}</div>
+      ${isConnected ? `
+        <div style="display:grid;gap:8px;font-size:14px;margin-bottom:16px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Gist ID</span><strong class="mono" style="font-size:12px">${escapeHtml(cfg.gistId)}</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Ultimo upload</span><strong>${cfg.lastUploadAt ? fmtDateTime(cfg.lastUploadAt) : '—'}</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Ultimo backup giornaliero</span><strong>${cfg.lastDailyBackupAt ? fmtDateTime(cfg.lastDailyBackupAt) : '—'}</strong></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn--amber" onclick="gistManualSync()">🔄 Sync ora</button>
+          <button class="btn btn--ghost" onclick="doDailyBackup()">📸 Backup snapshot ora</button>
+          <button class="btn btn--ghost" onclick="gistDisconnect()" style="margin-left:auto;color:var(--red)">Disconnetti</button>
+        </div>
+        <div id="backupList" style="margin-top:20px"></div>
+      ` : `
+        <p style="color:var(--muted);font-size:14px;margin-bottom:16px">
+          Collega un Gist privato GitHub per backup cloud automatici. Ogni modifica ai dati viene salvata online entro 30 secondi, ed ogni notte alle 00:00 viene creato uno snapshot giornaliero (conservati gli ultimi 30 giorni).
+        </p>
+        <div style="background:var(--amber-bg);padding:14px;border-radius:8px;font-size:13px;line-height:1.6;margin-bottom:16px">
+          <strong>Setup in 3 passaggi:</strong><br>
+          1. Vai su <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--amber)">github.com/settings/tokens</a> → <em>Generate new token (classic)</em><br>
+          2. Dai un nome (es. "Brioche Lab") e seleziona <strong>solo lo scope <code>gist</code></strong><br>
+          3. Copia il token (inizia con <code>ghp_</code>) e incollalo qui sotto
+        </div>
+        <div class="form-row">
+          <label class="form-label">Personal Access Token (PAT)</label>
+          <input type="password" id="gistPatInput" class="input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+        </div>
+        <button class="btn btn--amber" onclick="gistConnect(document.getElementById('gistPatInput').value)" style="width:100%;justify-content:center;margin-top:12px">
+          🔗 Connetti a GitHub Gist
+        </button>
+      `}
     </div>
 
     <div class="two-col">
       <div class="card">
-        <div class="card-h">📤 Carica nel cloud</div>
-        <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Scarica il backup e caricalo sulla cartella cloud condivisa.</p>
-        <button class="btn btn--amber" onclick="exportData()" style="width:100%;justify-content:center">
+        <div class="card-h">📤 Backup manuale</div>
+        <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Scarica un file JSON con tutti i dati per archiviazione locale.</p>
+        <button class="btn btn--ghost" onclick="exportData()" style="width:100%;justify-content:center">
           📥 Scarica backup completo
         </button>
-        <div style="margin-top:16px;padding:12px;background:var(--light-bg);border-radius:8px;font-size:13px;color:var(--muted);line-height:1.6">
-          <strong>Step semplici:</strong><br>
-          1. Premi il pulsante qui sopra<br>
-          2. Apri Google Drive / Dropbox<br>
-          3. Carica il file nella cartella condivisa<br>
-          4. Avvisa il collaboratore
-        </div>
       </div>
 
       <div class="card">
-        <div class="card-h">📥 Carica dal cloud</div>
-        <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Importa l'ultimo backup ricevuto dal collaboratore.</p>
+        <div class="card-h">📥 Ripristino manuale</div>
+        <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Carica un backup precedente. Sovrascrive i dati attuali.</p>
         <input type="file" id="importFileSync" accept=".json" style="margin-bottom:12px;width:100%">
         <button class="btn btn--ghost" onclick="importDataSync()" style="width:100%;justify-content:center">
           📤 Carica e ripristina
         </button>
-        <div style="margin-top:16px;padding:12px;background:var(--red-bg);border-radius:8px;font-size:13px;color:var(--red);line-height:1.6">
-          <strong>⚠ Attenzione:</strong> il caricamento sovrascrive tutti i tuoi dati locali. Esporta prima un backup di sicurezza!
-        </div>
       </div>
     </div>
 
@@ -4411,28 +5198,39 @@ function renderSync() {
           <span style="color:var(--muted)">ID dispositivo</span>
           <strong class="mono">${escapeHtml(deviceId)}</strong>
         </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--grey-light)">
+        <div style="display:flex;justify-content:space-between;padding:8px 0">
           <span style="color:var(--muted)">Ultimo salvataggio locale</span>
           <strong>${data.meta.ultimoSalvataggio ? fmtDateTime(data.meta.ultimoSalvataggio) : '—'}</strong>
         </div>
-        <div style="display:flex;justify-content:space-between;padding:8px 0">
-          <span style="color:var(--muted)">Ultima sincronizzazione</span>
-          <strong>${ultimaSync ? fmtDateTime(ultimaSync) : 'Mai sincronizzato'}</strong>
-        </div>
       </div>
     </div>
+  `;
+}
 
-    <div class="card" style="margin-top:24px;background:var(--amber-bg)">
-      <div class="card-h">💡 Workflow consigliato per 2 persone</div>
-      <ul style="margin:8px 0 0 20px;line-height:1.8;font-size:14px">
-        <li><strong>Decidete chi gestisce i dati "ufficiali"</strong> (es. tu il giorno, lei la sera)</li>
-        <li>Chi modifica esporta e carica su cloud condiviso <strong>a fine turno</strong></li>
-        <li>L'altro importa <strong>all'inizio del proprio turno</strong></li>
-        <li>Evitate di lavorare contemporaneamente per non sovrascrivere modifiche</li>
-        <li>Per un futuro upgrade a sincronizzazione real-time, leggi la sezione "Quando passare a Firebase" nella Guida</li>
-      </ul>
+function renderBackupList(filenames) {
+  const el = document.getElementById('backupList');
+  if (!el) return;
+  if (!filenames.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">Nessun backup giornaliero ancora presente. Il primo verrà creato alla prossima mezzanotte.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="card-h" style="margin-top:8px">📸 Snapshot giornalieri (${filenames.length})</div>
+    <div style="display:grid;gap:6px;font-size:13px;max-height:300px;overflow-y:auto">
+      ${filenames.map(fn => `
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--light-bg);border-radius:6px">
+          <span class="mono" style="flex:1">${escapeHtml(fn)}</span>
+          <button class="btn btn--ghost btn--small" onclick="restoreGistBackup('${escapeHtml(fn)}')">Ripristina</button>
+        </div>
+      `).join('')}
     </div>
   `;
+}
+
+async function refreshBackupList() {
+  if (currentPage !== 'sync') return;
+  const list = await listGistBackups();
+  renderBackupList(list);
 }
 
 function importDataSync() {
@@ -4491,6 +5289,56 @@ function renderGuida() {
           <li>Aggiungi i <strong>Clienti</strong> con P.IVA, PEC, codice destinatario SDI</li>
           <li>Imposta i <strong>listini personalizzati</strong> per cliente (scaglioni quantità)</li>
         </ol>
+      </div>
+
+      <h2>💾 Backup automatico cloud (GitHub Gist)</h2>
+      <p>Per <strong>non perdere mai i dati</strong> in caso di problemi col browser o aggiornamenti del codice, l'app può salvare automaticamente tutto su GitHub Gist (gratuito).</p>
+
+      <div class="info-box">
+        <div class="info-box-title">Setup (1 volta sola)</div>
+        <ol>
+          <li>Crea un account GitHub se non ce l'hai: <a href="https://github.com/signup" target="_blank">github.com/signup</a> <em>(consiglio: crea un account dedicato tipo "panificio-bot")</em></li>
+          <li>Vai su <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></li>
+          <li>Click <strong>"Generate new token"</strong> → <strong>"Generate new token (classic)"</strong></li>
+          <li>Dai un nome (es. "Brioche Lab"), <strong>spunta SOLO lo scope <code>gist</code></strong> (nient'altro)</li>
+          <li>Genera e <strong>copia il token</strong> (inizia con <code>ghp_</code>)</li>
+          <li>Vai in <strong>Sincronizzazione</strong> nell'app, incolla il token, click "Connetti"</li>
+        </ol>
+        <p style="margin-top:12px"><strong>Da questo momento</strong>:</p>
+        <ul>
+          <li>Ogni modifica viene salvata online entro 30 secondi</li>
+          <li>Ogni notte alle 00:00 viene creato uno snapshot giornaliero</li>
+          <li>Vengono conservati gli ultimi 30 snapshot (rolling)</li>
+          <li>Se cambi browser/dispositivo, basta inserire lo stesso token per recuperare tutto</li>
+        </ul>
+      </div>
+
+      <h2>🛒 App ordini per i clienti</h2>
+      <p>L'app principale può <strong>generare un link univoco</strong> per ogni cliente, che riceve così la sua versione "lite" dell'app per fare ordini in autonomia.</p>
+
+      <div class="info-box">
+        <div class="info-box-title">Come funziona</div>
+        <ol>
+          <li>Vai in <strong>Catalogo cliente</strong> e aggiungi i prodotti che vuoi rendere ordinabili</li>
+          <li>Vai in <strong>Clienti</strong>, sulla riga del cliente click sull'icona <strong>🔗</strong></li>
+          <li>Si apre una finestra con il link → click <strong>"Invia con WhatsApp"</strong> per condividerlo</li>
+          <li>Il cliente apre il link sul telefono → può <strong>aggiungere l'app alla home</strong> (icona sul telefono)</li>
+          <li>Quando il cliente invia un ordine, ricevi una <strong>notifica in-app</strong> con suono</li>
+          <li>Vai in <strong>🔔 Notifiche</strong> o in <strong>Ordini</strong> per vederli e confermarli</li>
+        </ol>
+      </div>
+
+      <p><strong>Stati ordine</strong>:</p>
+      <ul>
+        <li><span class="pill pill--amber">Nuovo (da confermare)</span> — appena ricevuto dall'app cliente</li>
+        <li><span class="pill pill--blue">Confermato</span> — accettato dal fornaio (visibile al cliente)</li>
+        <li><span class="pill pill--green">Consegnato</span> — consegna effettuata (visibile al cliente)</li>
+      </ul>
+
+      <div class="info-box" style="background:var(--amber-bg)">
+        <div class="info-box-title">⚠ Sicurezza link cliente</div>
+        <p>Il link contiene una credenziale che permette di scrivere ordini sul tuo Gist. <strong>Inviarlo SOLO al cliente diretto</strong>. Se sospetti che sia stato condiviso impropriamente, vai su GitHub e <strong>revoca il PAT</strong>, poi rigenerane uno nuovo e ridistribuisci i link.</p>
+        <p style="margin-top:8px">Per massima sicurezza, crea un account GitHub <strong>dedicato</strong> (es. "panificio-bot-xxx") da usare solo per questo, separato dal tuo account personale.</p>
       </div>
 
       <h2>📱 Installare come app sul telefono</h2>
@@ -5172,6 +6020,25 @@ render();
 
 // Save data periodically as safety
 setInterval(() => saveData(), 60000);
+
+// Online/offline detection per stato sync
+window.addEventListener('online', () => {
+  if (data.config.gistSync.enabled && gistStatusState.stato === 'offline') {
+    setGistStatus('pending', '');
+    gistManualSync();
+  }
+});
+window.addEventListener('offline', () => {
+  if (data.config.gistSync.enabled) setGistStatus('offline', 'Connessione assente');
+});
+
+// Avvia Gist sync (check cloud + backup giornaliero + polling ordini cliente)
+if (data.config.gistSync.enabled && data.config.gistSync.pat && data.config.gistSync.gistId) {
+  setGistStatus('syncing', 'Controllo cloud...');
+  gistCheckOnBoot().then(() => {
+    startPollingOrdini();
+  });
+}
 </script>
 
 </body>
