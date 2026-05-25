@@ -384,7 +384,12 @@ input, select, textarea { font: inherit; }
   <div class="setup-icon">🥐</div>
   <h1>Ordini · Brioche Lab</h1>
   <p>Per accedere a questa app, apri il link che ti ha inviato il panificio via WhatsApp.</p>
-  <p style="font-size:13px">Se hai problemi, ricontatta il panificio per richiedere un nuovo link.</p>
+  <div style="width:100%;max-width:340px;margin-top:24px;text-align:left">
+    <label style="font-size:13px;font-weight:600;color:var(--text);display:block;margin-bottom:6px">Hai già il link? Incollalo qui:</label>
+    <input type="text" id="linkRecoveryInput" placeholder="https://..." style="width:100%;padding:12px;border:1px solid var(--grey-bord);border-radius:8px;font-size:13px;font-family:monospace">
+    <button class="btn btn--full" style="margin-top:10px" onclick="ripristinaDaLink()">Apri</button>
+  </div>
+  <p style="font-size:12px;margin-top:20px;color:var(--muted)">Se hai problemi, ricontatta il panificio per richiedere un nuovo link.</p>
 </div>
 
 <header class="app-header" id="appHeader" style="display:none">
@@ -488,9 +493,37 @@ function parseQueryParams() {
     const payload = decodePayload(d);
     if (payload) {
       state.payload = payload;
+      state.lastLinkUrl = window.location.href;
       saveState();
-      history.replaceState(null, '', window.location.pathname);
+      // IMPORTANTE: NON pulisco la URL con history.replaceState.
+      // Su iOS "Aggiungi a Home" salva l'URL corrente: se la pulisco,
+      // l'icona sulla home aprirebbe cliente.html senza parametri e
+      // mostrerebbe la setup screen. Il payload non è una credenziale,
+      // può restare visibile nella barra indirizzi.
     }
+  }
+}
+
+function ripristinaDaLink() {
+  const inp = document.getElementById('linkRecoveryInput');
+  const url = (inp.value || '').trim();
+  if (!url) { showToast('Incolla il link ricevuto dal panificio', 'error'); return; }
+  try {
+    const u = new URL(url);
+    const params = new URLSearchParams(u.search);
+    const id = params.get('id');
+    const d = params.get('d');
+    if (!d) throw new Error('Link non valido');
+    const payload = decodePayload(d);
+    if (!payload) throw new Error('Link corrotto');
+    if (id) state.clienteId = id;
+    state.payload = payload;
+    state.lastLinkUrl = url;
+    saveState();
+    // Redirect alla URL completa, così l'icona della home la memorizza correttamente
+    window.location.href = url;
+  } catch(e) {
+    showToast('Link non valido: ' + e.message, 'error', 4000);
   }
 }
 
