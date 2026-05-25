@@ -15,10 +15,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
-  if (url.hostname === 'api.github.com' || url.hostname === 'gist.githubusercontent.com') {
-    e.respondWith(fetch(e.request).catch(() => new Response(JSON.stringify({ error: 'offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } })));
-    return;
-  }
   if (url.origin !== self.location.origin) return;
   e.respondWith(
     caches.match(e.request).then(cached => {

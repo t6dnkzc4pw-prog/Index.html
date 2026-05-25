@@ -1230,6 +1230,7 @@ const DEFAULT_DATA = {
       codiceDestinatario: '0000000',
       regimeFiscale: 'RF01',
     },
+    telefonoOrdini: '',
     gistSync: {
       enabled: false,
       pat: '',
@@ -1324,7 +1325,6 @@ const GIST_API = 'https://api.github.com';
 let gistUploadTimer = null;
 let gistStatusState = { stato: 'idle', msg: '', ts: 0 };
 let dailyBackupTimer = null;
-let pollingOrdiniTimer = null;
 
 function gistHeaders(pat) {
   return {
@@ -1371,42 +1371,9 @@ async function gistUploadDati() {
     data.meta.ultimaSincronizzazione = cfg.lastUploadAt;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setGistStatus('synced', 'Sincronizzato');
-    if (data.prodotti && data.prodotti.length) gistUploadCatalogoOrdiniClienti();
   } catch(e) {
     console.error('gistUploadDati:', e);
     setGistStatus('error', e.message);
-  }
-}
-
-async function gistUploadCatalogoOrdiniClienti() {
-  const cfg = data.config.gistSync;
-  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
-  try {
-    const ordiniPubblici = (data.ordini || []).map(o => ({
-      id: o.id, numero: o.numero, clienteId: o.clienteId, data: o.data, dataConsegna: o.dataConsegna,
-      righe: o.righe, note: o.note, stato: o.stato, totale: o.totale, source: o.source || 'fornaio',
-      createdAt: o.createdAt, updatedAt: o.updatedAt
-    }));
-    const clientiPub = (data.clienti || []).map(c => ({
-      id: c.id, nome: c.nome, ragioneSociale: c.ragioneSociale,
-      listino: Array.isArray(c.listino) ? c.listino : []
-    }));
-    const prodottiPubblici = (data.prodotti || [])
-      .filter(p => p.disponibile !== false)
-      .map(p => ({
-        id: p.id, codice: p.codice, nome: p.nome,
-        descrizione: p.descrizione || '', immagine: p.immagine || '',
-        prezzoDefault: p.prezzoDefault || 0,
-        scaglioniDefault: Array.isArray(p.scaglioniDefault) ? p.scaglioniDefault : [],
-        aliquotaIva: p.aliquotaIva || 10, pezziCartone: p.pezziCartone || 1,
-      }));
-    await gistPatchFiles(cfg.gistId, cfg.pat, {
-      [GIST_CATALOGO]: { content: JSON.stringify(prodottiPubblici, null, 2) },
-      [GIST_ORDINI]: { content: JSON.stringify(ordiniPubblici, null, 2) },
-      [GIST_CLIENTI_PUB]: { content: JSON.stringify(clientiPub, null, 2) },
-    });
-  } catch(e) {
-    console.error('gistUploadCatalogoOrdiniClienti:', e);
   }
 }
 
@@ -1627,47 +1594,27 @@ async function listGistBackups() {
 function generaLinkCliente(clienteId) {
   const cliente = data.clienti.find(c => c.id === clienteId);
   if (!cliente) { toast('Cliente non trovato', 'error'); return; }
-  const cfg = data.config.gistSync;
-  if (!cfg.enabled || !cfg.gistId || !cfg.pat) {
-    showModal({
-      title: 'Configura prima il sync',
-      body: `
-        <p>Per generare un link cliente devi prima configurare il sync GitHub Gist nella sezione <strong>Sincronizzazione</strong>.</p>
-        <p style="margin-top:12px;color:var(--muted);font-size:13px">Il link cliente usa il Gist per condividere catalogo e ricevere gli ordini.</p>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
-          <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
-          <button class="btn btn--amber" onclick="closeModal();navigateTo('sync')">Vai a Sincronizzazione</button>
-        </div>
-      `
-    });
-    return;
-  }
+  if (!checkTelefonoOrdini()) return;
   const prodottiDisponibili = (data.prodotti || []).filter(p => p.disponibile !== false);
   if (prodottiDisponibili.length === 0) {
     if (!confirm('Nessun prodotto è marcato come visibile ai clienti. Il cliente non potrà fare ordini.\n\nVuoi generare il link comunque?')) return;
   }
-  gistUploadCatalogoOrdiniClienti();
-  const base = window.location.href.replace(/\/index\.html.*$/, '').replace(/\/$/, '');
-  const url = `${base}/cliente.html?id=${clienteId}&k=${encodeURIComponent(cfg.pat)}&g=${cfg.gistId}`;
-  const whatsappText = encodeURIComponent(`Ciao ${cliente.ragioneSociale || cliente.nome || ''}, ecco il link per fare i tuoi ordini in autonomia:\n\n${url}\n\nTi consiglio di aggiungere l'app alla home del telefono per averla sempre a portata di mano!`);
+  const payload = buildClientePayload(cliente);
+  const url = buildClienteUrl(clienteId, payload);
+  const sizeKb = (url.length / 1024).toFixed(1);
+  const whatsappText = encodeURIComponent(`Ciao ${cliente.ragioneSociale || cliente.nome || ''}! 🥐\n\nEcco il link per fare i tuoi ordini personali:\n\n${url}\n\nApri il link sul telefono — puoi anche aggiungerlo come app sulla home schermata.`);
   const whatsappUrl = cliente.telefono ? `https://wa.me/${cliente.telefono.replace(/[^0-9]/g, '')}?text=${whatsappText}` : `https://wa.me/?text=${whatsappText}`;
   showModal({
     title: '🔗 Link app cliente · ' + (cliente.ragioneSociale || cliente.nome || ''),
     body: `
       <p style="color:var(--muted);font-size:14px;margin-bottom:12px">
-        Questo link permette al cliente di accedere alla sua app personalizzata.<br>
-        Una volta aperto, il cliente può <strong>aggiungerla alla home</strong> del telefono come un'app normale.
+        Il link è già pronto. Quando il cliente lo apre, vede catalogo e prezzi senza dover installare nulla.<br>
+        Gli ordini ti arriveranno via WhatsApp al numero <strong class="mono">${escapeHtml(data.config.telefonoOrdini || '—')}</strong>.
       </p>
-      <div style="background:var(--light-bg);padding:12px;border-radius:8px;margin-bottom:16px;word-break:break-all;font-family:monospace;font-size:12px;max-height:120px;overflow:auto">
+      <div style="background:var(--light-bg);padding:12px;border-radius:8px;margin-bottom:12px;word-break:break-all;font-family:monospace;font-size:11px;max-height:140px;overflow:auto">
         ${escapeHtml(url)}
       </div>
-      <div class="banner banner--amber" style="margin-bottom:16px">
-        <div class="banner-icon">⚠</div>
-        <div class="banner-content">
-          <div class="banner-title">Importante</div>
-          <div>Il link contiene una credenziale di accesso al tuo Gist. Inviarlo SOLO al cliente diretto, non a terzi.</div>
-        </div>
-      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Lunghezza link: ${sizeKb} KB${url.length > 8000 ? ' · ⚠ Potrebbe essere troppo lungo per alcuni client. Considera di ridurre il numero di prodotti visibili o le descrizioni.' : ' · OK per WhatsApp'}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn--amber" onclick="copiaLinkCliente('${escapeHtml(url).replace(/'/g, "&#39;")}')" style="flex:1;justify-content:center">📋 Copia link</button>
         <a class="btn btn--amber" href="${whatsappUrl}" target="_blank" style="flex:1;justify-content:center;text-decoration:none">💬 Invia con WhatsApp</a>
@@ -1679,17 +1626,80 @@ function generaLinkCliente(clienteId) {
   });
 }
 
+function buildClientePayload(cliente) {
+  const prodottiPubblici = (data.prodotti || [])
+    .filter(p => p.disponibile !== false)
+    .map(p => ({
+      id: p.id, nome: p.nome,
+      descrizione: p.descrizione || '',
+      immagine: p.immagine || '',
+      prezzoDefault: p.prezzoDefault || 0,
+      scaglioniDefault: Array.isArray(p.scaglioniDefault) ? p.scaglioniDefault : [],
+    }));
+  return {
+    v: 1,
+    cliente: cliente.ragioneSociale || cliente.nome || 'Cliente',
+    tel: data.config.telefonoOrdini || '',
+    catalogo: prodottiPubblici,
+    listino: Array.isArray(cliente.listino) ? cliente.listino : [],
+    azienda: data.config.azienda || 'Brioche Lab',
+    ts: new Date().toISOString(),
+  };
+}
+
+function encodePayload(payload) {
+  const json = JSON.stringify(payload);
+  const utf8 = unescape(encodeURIComponent(json));
+  return btoa(utf8).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function buildClienteUrl(clienteId, payload) {
+  const base = window.location.href.replace(/\/index\.html.*$/, '').replace(/\/$/, '');
+  return `${base}/cliente.html?id=${encodeURIComponent(clienteId)}&d=${encodePayload(payload)}`;
+}
+
+function checkTelefonoOrdini() {
+  if (data.config.telefonoOrdini && /^\+[0-9]{10,15}$/.test(data.config.telefonoOrdini)) return true;
+  showModal({
+    title: 'Manca il tuo numero WhatsApp',
+    body: `
+      <p style="color:var(--muted);font-size:14px;margin-bottom:14px">
+        Prima di generare il link cliente devi impostare il tuo numero WhatsApp.<br>
+        È il numero a cui i clienti invieranno gli ordini.
+      </p>
+      <div class="field">
+        <label class="field-label">📲 Il tuo numero WhatsApp</label>
+        <input type="tel" id="telOrdiniInline" class="field-input mono" placeholder="+393331234567" value="${escapeHtml(data.config.telefonoOrdini || '')}">
+        <div class="field-help">Con prefisso internazionale, senza spazi. Es. +39 per l'Italia.</div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button class="btn btn--ghost" onclick="closeModal()">Annulla</button>
+        <button class="btn btn--amber" onclick="salvaTelefonoOrdiniInline()">Salva e continua</button>
+      </div>
+    `
+  });
+  return false;
+}
+
+function salvaTelefonoOrdiniInline() {
+  const tel = (document.getElementById('telOrdiniInline').value || '').trim().replace(/\s+/g, '');
+  if (!/^\+[0-9]{10,15}$/.test(tel)) {
+    toast('Numero non valido. Usa il formato +393331234567', 'error');
+    return;
+  }
+  data.config.telefonoOrdini = tel;
+  saveData();
+  closeModal();
+  toast('Numero WhatsApp salvato', 'success');
+}
+
 function inviaLinkWhatsApp(clienteId) {
   const cliente = data.clienti.find(c => c.id === clienteId);
   if (!cliente) { toast('Cliente non trovato', 'error'); return; }
-  const cfg = data.config.gistSync;
-  if (!cfg.enabled || !cfg.gistId || !cfg.pat) {
-    return generaLinkCliente(clienteId);
-  }
-  gistUploadCatalogoOrdiniClienti();
-  const base = window.location.href.replace(/\/index\.html.*$/, '').replace(/\/$/, '');
-  const url = `${base}/cliente.html?id=${clienteId}&k=${encodeURIComponent(cfg.pat)}&g=${cfg.gistId}`;
-  const testo = `Ciao ${cliente.ragioneSociale || cliente.nome || ''}, ecco il link per i tuoi ordini personali:\n\n${url}\n\nApri il link sul telefono — puoi anche aggiungere l'app alla home per averla sempre a portata di mano.`;
+  if (!checkTelefonoOrdini()) return;
+  const payload = buildClientePayload(cliente);
+  const url = buildClienteUrl(clienteId, payload);
+  const testo = `Ciao ${cliente.ragioneSociale || cliente.nome || ''}! 🥐\n\nEcco il link per fare i tuoi ordini personali:\n\n${url}\n\nApri il link sul telefono — puoi anche aggiungerlo come app sulla home schermata.`;
   const numero = (cliente.telefono || '').replace(/[^0-9]/g, '');
   const waUrl = numero
     ? `https://wa.me/${numero}?text=${encodeURIComponent(testo)}`
@@ -1709,61 +1719,6 @@ function copiaLinkCliente(url) {
     document.body.removeChild(ta);
     toast('Link copiato', 'success');
   });
-}
-
-/* ════════════════════════════════════════════════════════════════════
-   POLLING ORDINI DAI CLIENTI (notifiche in-app)
-   ════════════════════════════════════════════════════════════════════ */
-async function pollOrdiniClienti() {
-  const cfg = data.config.gistSync;
-  if (!cfg.enabled || !cfg.gistId || !cfg.pat) return;
-  try {
-    const gist = await gistRead(cfg.gistId, cfg.pat);
-    const file = gist.files[GIST_ORDINI];
-    if (!file || !file.content) return;
-    const ordiniRemoti = JSON.parse(file.content);
-    if (!Array.isArray(ordiniRemoti)) return;
-    let cambiamenti = false;
-    for (const remoto of ordiniRemoti) {
-      if (remoto.source !== 'cliente-app') continue;
-      const locale = (data.ordini || []).find(o => o.id === remoto.id);
-      if (!locale) {
-        data.ordini = data.ordini || [];
-        data.ordini.push(remoto);
-        const cli = data.clienti.find(c => c.id === remoto.clienteId);
-        const nomeCliente = cli ? (cli.ragioneSociale || cli.nome) : 'Cliente';
-        addNotifica('nuovo-ordine', 'Nuovo ordine da ' + nomeCliente, `Ordine per ${fmtDate(remoto.dataConsegna)} · ${(remoto.righe || []).length} prodotti · € ${fmtEur(remoto.totale || 0)}`, remoto.id);
-        cambiamenti = true;
-      } else if ((remoto.updatedAt || '') > (locale.updatedAt || '')) {
-        const eraConfermato = locale.stato === 'programmato' || remoto.modificatoDaConfermato;
-        Object.assign(locale, remoto);
-        const cli = data.clienti.find(c => c.id === remoto.clienteId);
-        const nomeCliente = cli ? (cli.ragioneSociale || cli.nome) : 'Cliente';
-        const titolo = eraConfermato
-          ? '⚠ Ordine confermato MODIFICATO da ' + nomeCliente
-          : 'Ordine modificato da ' + nomeCliente;
-        const messaggio = eraConfermato
-          ? `Ordine #${remoto.numero || remoto.id.slice(-6)} precedentemente confermato è stato modificato. Da riconfermare.`
-          : `Ordine #${remoto.numero || remoto.id.slice(-6)} aggiornato`;
-        addNotifica('modifica-ordine', titolo, messaggio, remoto.id);
-        cambiamenti = true;
-      }
-    }
-    if (cambiamenti) {
-      data.config.pollingOrdini.ultimoCheck = new Date().toISOString();
-      saveData();
-      if (currentPage === 'ordini' || currentPage === 'dashboard' || currentPage === 'notifiche') render();
-    }
-  } catch(e) {
-    console.error('pollOrdiniClienti:', e);
-  }
-}
-
-function startPollingOrdini() {
-  if (pollingOrdiniTimer) clearInterval(pollingOrdiniTimer);
-  if (!data.config.gistSync.enabled) return;
-  pollingOrdiniTimer = setInterval(pollOrdiniClienti, 30000);
-  setTimeout(pollOrdiniClienti, 2000);
 }
 
 async function restoreGistBackup(filename) {
@@ -2742,7 +2697,6 @@ function saveProdotto(id) {
     .filter(s => s && (s.minQta > 0 || s.prezzo > 0))
     .map(s => ({ minQta: parseInt(s.minQta) || 0, prezzo: parseFloat(s.prezzo) || 0 }));
   saveData();
-  gistUploadCatalogoOrdiniClienti();
   closeModal();
   render();
   toast(id ? 'Prodotto aggiornato' : 'Prodotto creato');
@@ -3718,7 +3672,6 @@ function confermaNuovoOrdine(ordineId) {
   o.confermatoAt = new Date().toISOString();
   o.updatedAt = new Date().toISOString();
   saveData();
-  gistUploadCatalogoOrdiniClienti();
   render();
   const cliente = data.clienti.find(c => c.id === o.clienteId);
   toast(`✓ Ordine confermato per ${cliente?.ragioneSociale || 'cliente'}`);
@@ -3761,7 +3714,6 @@ function confermaConsegnato(ordineId) {
   o.updatedAt = new Date().toISOString();
   o.noteConsegna = (nota || '').trim();
   saveData();
-  gistUploadCatalogoOrdiniClienti();
   closeModal();
   render();
   const cliente = data.clienti.find(c => c.id === o.clienteId);
@@ -3777,7 +3729,6 @@ function riapriOrdine(ordineId) {
   o.noteConsegna = '';
   o.updatedAt = new Date().toISOString();
   saveData();
-  gistUploadCatalogoOrdiniClienti();
   closeModal();
   render();
   toast('Ordine riportato in "Da consegnare"', 'info');
@@ -5661,6 +5612,11 @@ function renderDati() {
               <input type="text" class="field-input" name="operatoreCorrente" value="${escapeHtml(data.config.operatoreCorrente)}" placeholder="Il tuo nome">
               <div class="field-help">Sarà precompilato nei nuovi lotti</div>
             </div>
+            <div class="field field--full">
+              <label class="field-label">📲 Numero WhatsApp per ricevere ordini</label>
+              <input type="tel" class="field-input mono" name="telefonoOrdini" value="${escapeHtml(data.config.telefonoOrdini || '')}" placeholder="+393331234567" pattern="\\+[0-9]{10,15}">
+              <div class="field-help">Quando i tuoi clienti inviano un ordine dall'app, ti arriva qui su WhatsApp. Inserisci il numero con il prefisso internazionale (es. +39 per Italia, senza spazi).</div>
+            </div>
           </div>
           <div style="margin-top:16px">
             <button type="button" class="btn btn--amber" onclick="saveConfig()">Salva</button>
@@ -5796,6 +5752,8 @@ function saveConfig() {
   data.config.piva = fd.get('piva');
   data.config.codiceFiscale = fd.get('codiceFiscale');
   data.config.operatoreCorrente = fd.get('operatoreCorrente');
+  const tel = (fd.get('telefonoOrdini') || '').trim().replace(/\s+/g, '');
+  data.config.telefonoOrdini = tel;
   saveData();
   toast('Dati aziendali salvati');
 }
@@ -6051,12 +6009,10 @@ window.addEventListener('offline', () => {
   if (data.config.gistSync.enabled) setGistStatus('offline', 'Connessione assente');
 });
 
-// Avvia Gist sync (check cloud + backup giornaliero + polling ordini cliente)
+// Avvia Gist sync (check cloud + backup giornaliero) — solo per il backup dati fornaio
 if (data.config.gistSync.enabled && data.config.gistSync.pat && data.config.gistSync.gistId) {
   setGistStatus('syncing', 'Controllo cloud...');
-  gistCheckOnBoot().then(() => {
-    startPollingOrdini();
-  });
+  gistCheckOnBoot();
 }
 </script>
 
