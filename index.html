@@ -1253,7 +1253,7 @@ function dayOfYear(d) {
 function generateLotCode(date, turno, prodottoCodice) {
   const yy = String(date.getFullYear()).slice(-2);
   const ddd = String(dayOfYear(date)).padStart(3, '0');
-  const dateStr = date.toISOString().slice(0, 10);
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
   const sameDay = data.lotti.filter(l =>
     l.data === dateStr && l.turno === turno && l.prodottoCodice === prodottoCodice
   );
@@ -1269,6 +1269,10 @@ function addMonths(date, months) {
 
 function fmtDate(d) {
   if (!d) return '—';
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, g] = d.split('-').map(Number);
+    return new Date(y, m - 1, g).toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
   const date = typeof d === 'string' ? new Date(d) : d;
   return date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
@@ -1277,6 +1281,29 @@ function fmtDateTime(d) {
   if (!d) return '—';
   const date = typeof d === 'string' ? new Date(d) : d;
   return date.toLocaleString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function oggiISO() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const g = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${g}`;
+}
+
+function isoOffset(giorni) {
+  const d = new Date();
+  d.setDate(d.getDate() + giorni);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const g = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${g}`;
+}
+
+function dataOggiLeggibile() {
+  return new Date().toLocaleDateString('it-IT', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
 }
 
 function escapeHtml(s) {
@@ -1482,7 +1509,7 @@ function render() {
    PAGE: DASHBOARD
    ════════════════════════════════════════════════════════════════════ */
 function renderDashboard() {
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiISO();
   const lottiOggi = data.lotti.filter(l => l.data === oggi).length;
   const totPezzi = data.lotti.reduce((s, l) => s + (parseInt(l.quantita) || 0), 0);
   const totPezziOggi = data.lotti.filter(l => l.data === oggi).reduce((s, l) => s + (parseInt(l.quantita) || 0), 0);
@@ -1796,7 +1823,7 @@ function renderLotti() {
 
 function openLottoModal(lottoId) {
   const lotto = lottoId ? data.lotti.find(l => l.id === lottoId) : null;
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiISO();
   const ora = new Date().getHours();
   const turnoSuggerito = ora < 13 ? 'M' : ora < 19 ? 'P' : 'N';
 
@@ -1881,7 +1908,8 @@ function saveLotto(lottoId) {
   lotto.operatore = fd.get('operatore');
   lotto.materieUsate = fd.get('materieUsate');
   lotto.note = fd.get('note');
-  lotto.tmc = addMonths(date, prodotto.tmcMesi).toISOString().slice(0,10);
+  const tmcDate = addMonths(date, prodotto.tmcMesi);
+  lotto.tmc = `${tmcDate.getFullYear()}-${String(tmcDate.getMonth()+1).padStart(2,'0')}-${String(tmcDate.getDate()).padStart(2,'0')}`;
 
   if (lotto.operatore) {
     data.config.operatoreCorrente = lotto.operatore;
@@ -2454,7 +2482,7 @@ function renderSpedizioni() {
 
 function openSpedModal(id, prefill) {
   const s = id ? data.spedizioni.find(x => x.id === id) : null;
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiISO();
   const nextDdt = `DDT-${new Date().getFullYear()}-${String(data.spedizioni.length + 1).padStart(3, '0')}`;
   const clienteId = s?.clienteId || prefill?.clienteId || '';
   const lottoId = s?.lottoId || prefill?.lottoId || '';
@@ -2598,7 +2626,7 @@ function renderOrdini() {
     <div class="page-header">
       <div>
         <div class="page-title">Ordini</div>
-        <div class="page-subtitle">${data.ordini.filter(o => o.dataConsegna === new Date().toISOString().slice(0,10) && o.stato === 'programmato').length} da consegnare oggi · ${data.ordini.length} totali</div>
+        <div class="page-subtitle"><strong style="text-transform:capitalize;color:var(--navy)">${dataOggiLeggibile()}</strong> · ${data.ordini.filter(o => o.dataConsegna === oggiISO() && o.stato === 'programmato').length} da consegnare oggi · ${data.ordini.length} totali</div>
       </div>
       <button class="btn btn--amber" onclick="openOrdineModal()" ${data.clienti.length===0?'disabled':''}>+ Nuovo ordine</button>
     </div>
@@ -2623,7 +2651,7 @@ function renderOrdini() {
 }
 
 function renderOrdiniOggi() {
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiISO();
   if (data.clienti.length === 0) return '';
 
   // Mappa cliente → ordini di oggi
@@ -2763,7 +2791,7 @@ function applicaFiltriOrdini(ordini) {
 }
 
 function righeOrdineTabellaHTML(ordini, mostraData) {
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiISO();
   return ordini.map(o => {
     const cliente = data.clienti.find(c => c.id === o.clienteId);
     const totale = totaleOrdine(o);
@@ -2831,9 +2859,9 @@ function sezioneOrdiniHTML(titolo, ordini, opts) {
 }
 
 function renderOrdiniTabella() {
-  const oggi = new Date().toISOString().slice(0, 10);
-  const domani = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const dopodomani = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+  const oggi = oggiISO();
+  const domani = isoOffset(1);
+  const dopodomani = isoOffset(2);
 
   const filtri = `
     <div class="card" style="margin-bottom:20px">
@@ -2907,13 +2935,13 @@ function renderOrdiniTabella() {
     sezioneOrdiniHTML(`🌅 Oggi · ${fmtPrima(oggi)}`, ordOggi, { mostraData: false, klass: 'cliente-sezione--bianco' }) +
     sezioneOrdiniHTML(`☀ Domani · ${fmtPrima(domani)}`, ordDomani, { mostraData: false, klass: 'cliente-sezione--verde' }) +
     sezioneOrdiniHTML(`⏭ Dopodomani · ${fmtPrima(dopodomani)}`, ordDopodomani, { mostraData: false, klass: 'cliente-sezione--blu' }) +
-    sezioneOrdiniHTML(`📅 Prossimi (dal ${fmtPrima(new Date(Date.now() + 3 * 86400000).toISOString().slice(0,10))})`, ordProssimi, { mostraData: true });
+    sezioneOrdiniHTML(`📅 Prossimi (dal ${fmtPrima(isoOffset(3))})`, ordProssimi, { mostraData: true });
 }
 
 function formattaLabelGiorno(isoDate) {
   if (!isoDate) return '—';
-  const oggi = new Date().toISOString().slice(0, 10);
-  const domani = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const oggi = oggiISO();
+  const domani = isoOffset(1);
   if (isoDate === oggi) return 'OGGI · ' + fmtDate(isoDate);
   if (isoDate === domani) return 'DOMANI · ' + fmtDate(isoDate);
   try {
@@ -2928,8 +2956,8 @@ function formattaLabelGiorno(isoDate) {
 function apriSchedaOrdineCliente(clienteId) {
   const cliente = data.clienti.find(c => c.id === clienteId);
   if (!cliente) return;
-  const oggi = new Date().toISOString().slice(0, 10);
-  const limite30gg = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const oggi = oggiISO();
+  const limite30gg = isoOffset(30);
   const ordini = data.ordini.filter(o => o.clienteId === clienteId);
 
   const programmatiOggi = ordini.filter(o => o.stato === 'programmato' && o.dataConsegna === oggi);
@@ -3179,7 +3207,7 @@ function rerenderOrdineRighe() {
 
 function openOrdineModal(id, prefill) {
   const o = id ? data.ordini.find(x => x.id === id) : null;
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiISO();
   ordineDraftRighe = o ? [...(o.righe || [])] : [];
   if (ordineDraftRighe.length === 0) ordineDraftRighe.push({ prodottoId: '', quantita: '', prezzo: '' });
   const clienteIdInit = o?.clienteId || prefill?.clienteId || '';
@@ -3520,7 +3548,7 @@ function openFatturaPreviewModal(clienteId, fatturaId) {
   if (!calc.cliente) { toast('Cliente non valido', 'error'); return; }
   const cfg = data.config.fatturazione;
   const numero = f?.numero || generateFatturaNumero();
-  const dataDoc = f?.data || new Date().toISOString().slice(0, 10);
+  const dataDoc = f?.data || oggiISO();
 
   showModal({
     title: f ? `Fattura ${numero}` : 'Anteprima fattura',
@@ -3665,7 +3693,7 @@ function togglePagamento(id) {
     render();
     toast('Pagamento annullato', 'info');
   } else {
-    const oggi = new Date().toISOString().slice(0, 10);
+    const oggi = oggiISO();
     const dataPag = prompt(`Data di pagamento per fattura ${f.numero}:`, oggi);
     if (!dataPag) return;
     f.pagata = true;
@@ -4262,7 +4290,7 @@ function openHaccpModal() {
         <div class="form-grid">
           <div class="field">
             <label class="field-label">Data</label>
-            <input type="date" class="field-input" name="data" value="${now.toISOString().slice(0,10)}" required>
+            <input type="date" class="field-input" name="data" value="${oggiISO()}" required>
           </div>
           <div class="field">
             <label class="field-label">Ora</label>
@@ -4961,7 +4989,7 @@ function exportData() {
   const blob = new Blob([json], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = oggiISO();
   a.href = url;
   a.download = `brioche-lab-backup-${today}.json`;
   a.click();
@@ -4995,7 +5023,7 @@ function exportCsv(tipo) {
   const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = oggiISO();
   a.href = url;
   a.download = `${filename}-${today}.csv`;
   a.click();
