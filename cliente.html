@@ -6,7 +6,7 @@
 <title>Ordini · Brioche Lab</title>
 <meta name="description" content="App per ordini al panificio">
 <meta name="theme-color" content="#1B3A6B">
-<link rel="manifest" href="manifest-cliente.json">
+<!-- Manifest installato dinamicamente da JS con start_url = URL corrente (con parametri) -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ordini">
@@ -975,6 +975,42 @@ function dismissInAppBanner() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   MANIFEST DINAMICO — start_url = URL corrente (con parametri)
+   Risolve il bug "icona home apre setup screen invece del catalogo":
+   iOS Safari 16+ usa start_url del manifest e ignora l'URL corrente,
+   quindi serve un manifest in cui start_url contenga ?id=...&d=...
+   ════════════════════════════════════════════════════════════════════ */
+function installDynamicManifest() {
+  if (!state.payload) return;
+  const iconSm = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='42' fill='#1B3A6B'/><circle cx='96' cy='96' r='70' fill='none' stroke='#E8A020' stroke-width='8'/><path d='M42 86 Q42 132 96 132 Q150 132 150 86 Q150 108 122 116 Q96 120 70 116 Q42 108 42 86' fill='#E8A020' stroke='#B8800F' stroke-width='2'/></svg>");
+  const iconLg = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='112' fill='#1B3A6B'/><circle cx='256' cy='256' r='186' fill='none' stroke='#E8A020' stroke-width='22'/><path d='M112 230 Q112 352 256 352 Q400 352 400 230 Q400 290 324 310 Q256 320 188 310 Q112 290 112 230' fill='#E8A020' stroke='#B8800F' stroke-width='6'/></svg>");
+  const manifest = {
+    name: "Ordini · " + (state.payload.azienda || "Brioche Lab"),
+    short_name: "Ordini",
+    description: "App per fare ordini al panificio",
+    start_url: window.location.href,
+    scope: "./",
+    display: "standalone",
+    orientation: "portrait",
+    theme_color: "#1B3A6B",
+    background_color: "#F0F4FA",
+    lang: "it",
+    icons: [
+      { src: iconSm, sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" },
+      { src: iconLg, sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }
+    ]
+  };
+  const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+  let link = document.querySelector('link[rel="manifest"]');
+  if (!link) {
+    link = document.createElement('link');
+    link.rel = 'manifest';
+    document.head.appendChild(link);
+  }
+  link.href = dataUri;
+}
+
+/* ════════════════════════════════════════════════════════════════════
    SERVICE WORKER
    ════════════════════════════════════════════════════════════════════ */
 if ('serviceWorker' in navigator) {
@@ -992,6 +1028,7 @@ if (!state.payload) {
 } else {
   state.visitCount = (state.visitCount || 0) + 1;
   saveState();
+  installDynamicManifest();
   document.getElementById('appHeader').style.display = 'flex';
   document.getElementById('tabBar').style.display = 'flex';
   updateHeader();
