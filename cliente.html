@@ -301,6 +301,63 @@ input, select, textarea { font: inherit; }
 .order-total { font-weight: 700; color: var(--navy); }
 .order-actions { display: flex; gap: 6px; margin-top: 10px; }
 
+/* Skeleton */
+.skeleton-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.sk {
+  background: linear-gradient(90deg, #eef1f5 0%, #f7f9fc 50%, #eef1f5 100%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+  border-radius: 6px;
+}
+.sk--img { width: 72px; height: 72px; flex-shrink: 0; border-radius: 8px; }
+.sk--line { height: 14px; margin-bottom: 8px; }
+.sk--line.w70 { width: 70%; }
+.sk--line.w50 { width: 50%; }
+.sk--line.w30 { width: 30%; }
+@keyframes skeletonPulse {
+  0% { background-position: 0% 50%; }
+  100% { background-position: -200% 50%; }
+}
+
+/* In-app browser banner */
+.inapp-banner {
+  background: var(--amber-bg);
+  border-left: 3px solid var(--amber);
+  padding: 10px 14px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: sticky;
+  top: 64px;
+  z-index: 9;
+}
+.inapp-banner button {
+  background: var(--amber);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+/* Scaglione hint */
+.scaglione-hint {
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
 /* Toast */
 .toast-container {
   position: fixed;
@@ -462,6 +519,7 @@ let state = {
   gistId: '',
   nomeCliente: '',
   catalogo: [],
+  listinoCliente: [],
   carrello: {},  // prodottoId → qty
   note: '',
   dataConsegna: '',
@@ -469,12 +527,50 @@ let state = {
   lastCatalogoUpdate: '',
   lastDailyBackupAt: '',
   ultimaSincronizzazione: '',
+  visitCount: 0,
 };
 
 let currentTab = 'catalogo';
 let dailyBackupTimer = null;
 let catalogoPollTimer = null;
 let ordiniPollTimer = null;
+let catalogoLoaded = false;
+
+/* ════════════════════════════════════════════════════════════════════
+   PRICING — Scaglioni a livello prodotto / listino cliente
+   ════════════════════════════════════════════════════════════════════ */
+function prezzoPerQuantita(p, qta) {
+  qta = parseInt(qta) || 0;
+  // Listino specifico del cliente
+  if (state.listinoCliente && Array.isArray(state.listinoCliente)) {
+    const voce = state.listinoCliente.find(v => v.prodottoId === p.id);
+    if (voce && Array.isArray(voce.scaglioni) && voce.scaglioni.length > 0) {
+      const sortati = [...voce.scaglioni].sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+      let prezzo = null;
+      for (const s of sortati) if (qta >= (s.minQta||0)) prezzo = s.prezzo;
+      if (prezzo != null) return Number(prezzo) || 0;
+    }
+  }
+  // Scaglioni default del prodotto
+  if (Array.isArray(p.scaglioniDefault) && p.scaglioniDefault.length > 0) {
+    const sortati = [...p.scaglioniDefault].sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+    let prezzo = null;
+    for (const s of sortati) if (qta >= (s.minQta||0)) prezzo = s.prezzo;
+    if (prezzo != null) return Number(prezzo) || 0;
+  }
+  return Number(p.prezzoDefault) || 0;
+}
+
+function prezzoMinimoVisibile(p) {
+  const tutti = [];
+  if (state.listinoCliente) {
+    const voce = state.listinoCliente.find(v => v.prodottoId === p.id);
+    if (voce && Array.isArray(voce.scaglioni)) voce.scaglioni.forEach(s => tutti.push(s.prezzo));
+  }
+  if (Array.isArray(p.scaglioniDefault)) p.scaglioniDefault.forEach(s => tutti.push(s.prezzo));
+  tutti.push(p.prezzoDefault || 0);
+  return Math.min(...tutti.filter(x => x > 0));
+}
 
 /* ════════════════════════════════════════════════════════════════════
    STORAGE
@@ -552,27 +648,34 @@ async function fetchCatalogo() {
     const gist = await gistRead();
     const fileCat = gist.files[GIST_CATALOGO];
     if (fileCat && fileCat.content) {
-      state.catalogo = JSON.parse(fileCat.content).filter(p => p.attivo !== false);
+      state.catalogo = JSON.parse(fileCat.content);
       state.lastCatalogoUpdate = gist.updated_at;
     }
     const fileCli = gist.files[GIST_CLIENTI_PUB];
     if (fileCli && fileCli.content) {
       const lista = JSON.parse(fileCli.content);
       const me = lista.find(c => c.id === state.clienteId);
-      if (me) state.nomeCliente = me.ragioneSociale || me.nome || '';
+      if (me) {
+        state.nomeCliente = me.ragioneSociale || me.nome || '';
+        state.listinoCliente = Array.isArray(me.listino) ? me.listino : [];
+      }
     }
     const fileOrd = gist.files[GIST_ORDINI];
     if (fileOrd && fileOrd.content) {
       const tutti = JSON.parse(fileOrd.content);
       state.mieiOrdini = tutti.filter(o => o.clienteId === state.clienteId);
     }
+    catalogoLoaded = true;
     saveState();
     if (currentTab === 'catalogo') renderCatalogo();
     if (currentTab === 'ordini') renderOrdini();
     updateHeader();
+    updateBadges();
   } catch(e) {
     console.error('fetchCatalogo:', e);
-    showToast('Errore connessione: ' + e.message, 'error');
+    if (!state.catalogo || !state.catalogo.length) {
+      showToast('Connessione lenta o assente. Riprova tra poco.', 'error', 4000);
+    }
   }
 }
 
@@ -629,6 +732,11 @@ function updateBadges() {
 function renderCatalogo() {
   const main = document.getElementById('mainContent');
   if (!state.catalogo || !state.catalogo.length) {
+    if (!catalogoLoaded) {
+      main.innerHTML = renderSkeleton();
+      updateCartUI();
+      return;
+    }
     main.innerHTML = `
       <div class="banner">
         Il catalogo non è ancora disponibile. Riprova tra qualche istante o contatta il panificio.
@@ -647,13 +755,23 @@ function renderCatalogo() {
     </div>
     ${state.catalogo.map(p => {
       const qty = state.carrello[p.id] || 0;
+      const prezzoCorrente = prezzoPerQuantita(p, qty || 1);
+      const prezzoMin = prezzoMinimoVisibile(p);
+      const haScaglioni = (Array.isArray(p.scaglioniDefault) && p.scaglioniDefault.length > 0) ||
+        (state.listinoCliente && state.listinoCliente.find(v => v.prodottoId === p.id && v.scaglioni && v.scaglioni.length > 0));
+      const hintScaglione = haScaglioni && qty > 0 && prezzoCorrente < (p.prezzoDefault || 0)
+        ? `<div class="scaglione-hint">✓ Prezzo scaglione applicato</div>`
+        : haScaglioni && qty === 0
+        ? `<div class="scaglione-hint">📊 Da € ${fmtEur(prezzoMin)} con scaglioni</div>`
+        : '';
       return `
         <div class="prod-card">
           ${p.immagine ? `<img src="${escapeHtml(p.immagine)}" class="prod-img" onerror="this.style.display='none'">` : `<div class="prod-img" style="display:flex;align-items:center;justify-content:center;font-size:28px">🥐</div>`}
           <div class="prod-info">
             <div class="prod-name">${escapeHtml(p.nome)}</div>
             ${p.descrizione ? `<div class="prod-desc">${escapeHtml(p.descrizione)}</div>` : ''}
-            <div class="prod-price">€ ${fmtEur(p.prezzo)}</div>
+            <div class="prod-price">€ ${fmtEur(prezzoCorrente)}</div>
+            ${hintScaglione}
           </div>
           <div class="qty-ctrl">
             <button class="qty-btn" onclick="changeQty('${p.id}', -1)" ${qty === 0 ? 'disabled' : ''}>−</button>
@@ -665,6 +783,26 @@ function renderCatalogo() {
     }).join('')}
   `;
   updateCartUI();
+}
+
+function renderSkeleton() {
+  const cards = [];
+  for (let i = 0; i < 4; i++) {
+    cards.push(`
+      <div class="skeleton-card">
+        <div class="sk sk--img"></div>
+        <div style="flex:1">
+          <div class="sk sk--line w70"></div>
+          <div class="sk sk--line w50"></div>
+          <div class="sk sk--line w30"></div>
+        </div>
+      </div>
+    `);
+  }
+  return `
+    <div style="color:var(--muted);font-size:13px;text-align:center;padding:10px 0">Carico il catalogo…</div>
+    ${cards.join('')}
+  `;
 }
 
 function changeQty(prodId, delta) {
@@ -688,7 +826,7 @@ function updateCartUI() {
   ids.forEach(id => {
     const qty = state.carrello[id];
     const p = state.catalogo.find(x => x.id === id);
-    if (p) { count += qty; total += qty * p.prezzo; }
+    if (p) { count += qty; total += qty * prezzoPerQuantita(p, qty); }
   });
   document.getElementById('cartCount').textContent = `${count} articol${count === 1 ? 'o' : 'i'}`;
   document.getElementById('cartTotal').textContent = '€ ' + fmtEur(total);
@@ -704,12 +842,13 @@ function openCartDetail() {
     const qty = state.carrello[id];
     const p = state.catalogo.find(x => x.id === id);
     if (!p) return '';
-    const lineTotal = qty * p.prezzo;
+    const prezzoU = prezzoPerQuantita(p, qty);
+    const lineTotal = qty * prezzoU;
     return `
       <div class="cart-line">
         <div class="cart-line-info">
           <div class="cart-line-name">${escapeHtml(p.nome)}</div>
-          <div class="cart-line-meta">${qty} × € ${fmtEur(p.prezzo)}</div>
+          <div class="cart-line-meta">${qty} × € ${fmtEur(prezzoU)}</div>
         </div>
         <div class="cart-line-price">€ ${fmtEur(lineTotal)}</div>
         <button class="qty-btn" onclick="changeQty('${id}', -1);openCartDetail()" style="width:30px;height:30px;font-size:16px;background:var(--red)">−</button>
@@ -718,7 +857,7 @@ function openCartDetail() {
   }).join('');
   const total = ids.reduce((s, id) => {
     const p = state.catalogo.find(x => x.id === id);
-    return p ? s + state.carrello[id] * p.prezzo : s;
+    return p ? s + state.carrello[id] * prezzoPerQuantita(p, state.carrello[id]) : s;
   }, 0);
   const domani = new Date(Date.now() + 86400000).toISOString().slice(0,10);
   document.getElementById('cartDetailBody').innerHTML = `
@@ -757,41 +896,66 @@ async function submitOrder() {
   const righe = ids.map(id => {
     const p = state.catalogo.find(x => x.id === id);
     if (!p) return null;
+    const qty = state.carrello[id];
+    const prezzoU = prezzoPerQuantita(p, qty);
     return {
       prodottoId: id,
       nome: p.nome,
-      prezzo: p.prezzo,
-      quantita: state.carrello[id],
-      subtotale: state.carrello[id] * p.prezzo,
+      prezzo: prezzoU,
+      quantita: qty,
+      subtotale: qty * prezzoU,
     };
   }).filter(Boolean);
   const totale = righe.reduce((s, r) => s + r.subtotale, 0);
   const now = new Date().toISOString();
-  const ordine = {
-    id: 'ord-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-    numero: 'C' + Date.now().toString(36).toUpperCase().slice(-6),
-    clienteId: state.clienteId,
-    data: now.slice(0,10),
-    dataConsegna: dataConsegna,
-    righe,
-    note,
-    stato: 'nuovo',
-    totale,
-    source: 'cliente-app',
-    createdAt: now,
-    updatedAt: now,
-  };
+  const inModifica = !!state.modificaOrdineId;
+  const eraConfermato = !!state.modificaOrdineEraConfermato;
+  let ordine;
+  if (inModifica) {
+    const esistente = state.mieiOrdini.find(o => o.id === state.modificaOrdineId);
+    ordine = Object.assign({}, esistente || {}, {
+      id: state.modificaOrdineId,
+      righe, note, dataConsegna, totale,
+      stato: 'nuovo',
+      modificatoDaConfermato: eraConfermato,
+      updatedAt: now,
+    });
+  } else {
+    ordine = {
+      id: 'ord-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
+      numero: 'C' + Date.now().toString(36).toUpperCase().slice(-6),
+      clienteId: state.clienteId,
+      data: now.slice(0,10),
+      dataConsegna,
+      righe, note,
+      stato: 'nuovo',
+      totale,
+      source: 'cliente-app',
+      createdAt: now,
+      updatedAt: now,
+    };
+  }
   const btn = document.getElementById('submitOrderBtn');
   btn.disabled = true;
   btn.textContent = 'Invio in corso...';
   try {
     await pushOrdine(ordine);
-    state.mieiOrdini.unshift(ordine);
+    if (inModifica) {
+      const idx = state.mieiOrdini.findIndex(o => o.id === ordine.id);
+      if (idx >= 0) state.mieiOrdini[idx] = ordine;
+      else state.mieiOrdini.unshift(ordine);
+    } else {
+      state.mieiOrdini.unshift(ordine);
+    }
     state.carrello = {};
     state.note = '';
+    state.modificaOrdineId = '';
+    state.modificaOrdineEraConfermato = false;
     saveState();
     closeCartDetail();
-    showToast('✓ Ordine inviato! Il panificio lo confermerà a breve.', 'success', 5000);
+    showToast(inModifica
+      ? '✓ Ordine aggiornato' + (eraConfermato ? '. Il panificio dovrà riconfermarlo.' : '.')
+      : '✓ Ordine inviato! Il panificio lo confermerà a breve.', 'success', 5000);
     setTab('ordini');
   } catch(e) {
     console.error('submitOrder:', e);
@@ -841,6 +1005,7 @@ function renderOrderCard(o) {
   else if (o.stato === 'annullato') { pillCls = 'pill-annullato'; pillLabel = 'Annullato'; }
   else { pillCls = 'pill-nuovo'; pillLabel = '⏳ In attesa di conferma'; }
   const lineeSummary = (o.righe || []).slice(0,3).map(r => `${r.quantita}× ${r.nome}`).join(', ') + ((o.righe || []).length > 3 ? '...' : '');
+  const modificabile = o.stato !== 'consegnato' && o.stato !== 'annullato';
   return `
     <div class="order-card">
       <div class="order-head">
@@ -853,7 +1018,7 @@ function renderOrderCard(o) {
         ${o.note ? `<div style="font-size:12px;color:var(--muted);margin-bottom:6px"><strong>Note:</strong> ${escapeHtml(o.note)}</div>` : ''}
         <div class="order-total">Totale: € ${fmtEur(o.totale || 0)}</div>
       </div>
-      ${o.stato === 'nuovo' ? `
+      ${modificabile ? `
         <div class="order-actions">
           <button class="btn btn--ghost" style="flex:1;font-size:13px;padding:8px" onclick="modificaOrdine('${o.id}')">✏️ Modifica</button>
           <button class="btn" style="background:var(--red);flex:1;font-size:13px;padding:8px" onclick="annullaOrdine('${o.id}')">Annulla</button>
@@ -866,16 +1031,16 @@ function renderOrderCard(o) {
 function modificaOrdine(id) {
   const o = state.mieiOrdini.find(x => x.id === id);
   if (!o) return;
-  if (!confirm('Vuoi modificare questo ordine? Il carrello attuale verrà sostituito con questo ordine.')) return;
+  const messaggio = o.stato === 'programmato'
+    ? 'Questo ordine è già stato CONFERMATO dal panificio. Modificandolo, dovrà essere riconfermato.\n\nVuoi continuare?'
+    : 'Modifica questo ordine. Il carrello attuale verrà sostituito.';
+  if (!confirm(messaggio)) return;
   state.carrello = {};
   (o.righe || []).forEach(r => { state.carrello[r.prodottoId] = r.quantita; });
   state.note = o.note || '';
   state.dataConsegna = o.dataConsegna;
-  state.mieiOrdini = state.mieiOrdini.filter(x => x.id !== id);
-  // Marca annullato sul Gist
-  o.stato = 'annullato';
-  o.updatedAt = new Date().toISOString();
-  pushOrdine(o).catch(e => console.error(e));
+  state.modificaOrdineId = id;
+  state.modificaOrdineEraConfermato = (o.stato === 'programmato');
   saveState();
   setTab('catalogo');
   openCartDetail();
@@ -1018,7 +1183,7 @@ function closeModal() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   PWA install prompt
+   PWA install prompt (silenzioso, solo dopo 2 visite)
    ════════════════════════════════════════════════════════════════════ */
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -1027,8 +1192,9 @@ window.addEventListener('beforeinstallprompt', (e) => {
   setTimeout(() => {
     if (!deferredPrompt) return;
     if (localStorage.getItem('installPromptShown')) return;
+    if ((state.visitCount || 0) < 2) return;
     showInstallPrompt();
-  }, 4000);
+  }, 6000);
 });
 
 function showInstallPrompt() {
@@ -1064,7 +1230,7 @@ function dismissInstall() {
 function checkIOSInstallBanner() {
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  if (isIOS && !isStandalone && !localStorage.getItem('iosInstallShown')) {
+  if (isIOS && !isStandalone && !localStorage.getItem('iosInstallShown') && (state.visitCount || 0) >= 2) {
     setTimeout(() => {
       document.getElementById('modalContent').innerHTML = `
         <h3>📲 Installa sulla Home</h3>
@@ -1079,6 +1245,35 @@ function checkIOSInstallBanner() {
       document.getElementById('modal').classList.add('open');
     }, 3000);
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   IN-APP BROWSER DETECTION
+   ════════════════════════════════════════════════════════════════════ */
+function isInAppBrowser() {
+  const ua = navigator.userAgent || '';
+  return /FBAN|FBAV|Instagram|Line|WhatsApp|Messenger|TikTok|Snapchat/i.test(ua);
+}
+
+function showInAppBanner() {
+  if (!isInAppBrowser()) return;
+  if (localStorage.getItem('inAppBannerDismissed')) return;
+  const tabBar = document.getElementById('tabBar');
+  if (!tabBar) return;
+  const banner = document.createElement('div');
+  banner.className = 'inapp-banner';
+  banner.id = 'inAppBanner';
+  banner.innerHTML = `
+    <span>💡 Per la migliore esperienza, apri questo link nel browser del telefono</span>
+    <button onclick="dismissInAppBanner()">OK</button>
+  `;
+  tabBar.parentNode.insertBefore(banner, tabBar.nextSibling);
+}
+
+function dismissInAppBanner() {
+  localStorage.setItem('inAppBannerDismissed', '1');
+  const b = document.getElementById('inAppBanner');
+  if (b) b.remove();
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -1097,10 +1292,14 @@ parseQueryParams();
 if (!state.clienteId || !state.pat || !state.gistId) {
   document.getElementById('setupScreen').style.display = 'flex';
 } else {
+  state.visitCount = (state.visitCount || 0) + 1;
+  saveState();
   document.getElementById('appHeader').style.display = 'flex';
   document.getElementById('tabBar').style.display = 'flex';
+  catalogoLoaded = !!(state.catalogo && state.catalogo.length);
   updateHeader();
   setTab('catalogo');
+  showInAppBanner();
   recoverFromGistIfEmpty().then(() => fetchCatalogo());
   startPolling();
   scheduleDailyBackup();

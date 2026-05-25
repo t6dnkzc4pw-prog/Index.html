@@ -1104,10 +1104,6 @@ input, select, textarea { font-family: inherit; font-size: inherit; }
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         Ordini
       </div>
-      <div class="nav-item" data-page="catalogo">
-        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-        Catalogo cliente
-      </div>
       <div class="nav-item" data-page="notifiche">
         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         Notifiche<span id="notificheBadgeSidebar" class="notifiche-badge" style="display:none">0</span>
@@ -1250,7 +1246,6 @@ const DEFAULT_DATA = {
       ultimoCheck: '',
     }
   },
-  catalogo: [],
   notificheInApp: [],
   meta: {
     ultimaSincronizzazione: null,
@@ -1376,7 +1371,7 @@ async function gistUploadDati() {
     data.meta.ultimaSincronizzazione = cfg.lastUploadAt;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setGistStatus('synced', 'Sincronizzato');
-    if (data.catalogo && data.catalogo.length) gistUploadCatalogoOrdiniClienti();
+    if (data.prodotti && data.prodotti.length) gistUploadCatalogoOrdiniClienti();
   } catch(e) {
     console.error('gistUploadDati:', e);
     setGistStatus('error', e.message);
@@ -1392,9 +1387,21 @@ async function gistUploadCatalogoOrdiniClienti() {
       righe: o.righe, note: o.note, stato: o.stato, totale: o.totale, source: o.source || 'fornaio',
       createdAt: o.createdAt, updatedAt: o.updatedAt
     }));
-    const clientiPub = (data.clienti || []).map(c => ({ id: c.id, nome: c.nome, ragioneSociale: c.ragioneSociale }));
+    const clientiPub = (data.clienti || []).map(c => ({
+      id: c.id, nome: c.nome, ragioneSociale: c.ragioneSociale,
+      listino: Array.isArray(c.listino) ? c.listino : []
+    }));
+    const prodottiPubblici = (data.prodotti || [])
+      .filter(p => p.disponibile !== false)
+      .map(p => ({
+        id: p.id, codice: p.codice, nome: p.nome,
+        descrizione: p.descrizione || '', immagine: p.immagine || '',
+        prezzoDefault: p.prezzoDefault || 0,
+        scaglioniDefault: Array.isArray(p.scaglioniDefault) ? p.scaglioniDefault : [],
+        aliquotaIva: p.aliquotaIva || 10, pezziCartone: p.pezziCartone || 1,
+      }));
     await gistPatchFiles(cfg.gistId, cfg.pat, {
-      [GIST_CATALOGO]: { content: JSON.stringify(data.catalogo || [], null, 2) },
+      [GIST_CATALOGO]: { content: JSON.stringify(prodottiPubblici, null, 2) },
       [GIST_ORDINI]: { content: JSON.stringify(ordiniPubblici, null, 2) },
       [GIST_CLIENTI_PUB]: { content: JSON.stringify(clientiPub, null, 2) },
     });
@@ -1635,8 +1642,9 @@ function generaLinkCliente(clienteId) {
     });
     return;
   }
-  if (!data.catalogo || data.catalogo.length === 0) {
-    if (!confirm('Il catalogo è vuoto. Il cliente non potrà fare ordini.\n\nVuoi generare il link comunque?')) return;
+  const prodottiDisponibili = (data.prodotti || []).filter(p => p.disponibile !== false);
+  if (prodottiDisponibili.length === 0) {
+    if (!confirm('Nessun prodotto è marcato come visibile ai clienti. Il cliente non potrà fare ordini.\n\nVuoi generare il link comunque?')) return;
   }
   gistUploadCatalogoOrdiniClienti();
   const base = window.location.href.replace(/\/index\.html.*$/, '').replace(/\/$/, '');
@@ -1669,6 +1677,25 @@ function generaLinkCliente(clienteId) {
       </div>
     `
   });
+}
+
+function inviaLinkWhatsApp(clienteId) {
+  const cliente = data.clienti.find(c => c.id === clienteId);
+  if (!cliente) { toast('Cliente non trovato', 'error'); return; }
+  const cfg = data.config.gistSync;
+  if (!cfg.enabled || !cfg.gistId || !cfg.pat) {
+    return generaLinkCliente(clienteId);
+  }
+  gistUploadCatalogoOrdiniClienti();
+  const base = window.location.href.replace(/\/index\.html.*$/, '').replace(/\/$/, '');
+  const url = `${base}/cliente.html?id=${clienteId}&k=${encodeURIComponent(cfg.pat)}&g=${cfg.gistId}`;
+  const testo = `Ciao ${cliente.ragioneSociale || cliente.nome || ''}, ecco il link per i tuoi ordini personali:\n\n${url}\n\nApri il link sul telefono — puoi anche aggiungere l'app alla home per averla sempre a portata di mano.`;
+  const numero = (cliente.telefono || '').replace(/[^0-9]/g, '');
+  const waUrl = numero
+    ? `https://wa.me/${numero}?text=${encodeURIComponent(testo)}`
+    : `https://wa.me/?text=${encodeURIComponent(testo)}`;
+  window.open(waUrl, '_blank');
+  toast('WhatsApp aperto. Conferma l\'invio nel chat.', 'success');
 }
 
 function copiaLinkCliente(url) {
@@ -1708,10 +1735,17 @@ async function pollOrdiniClienti() {
         addNotifica('nuovo-ordine', 'Nuovo ordine da ' + nomeCliente, `Ordine per ${fmtDate(remoto.dataConsegna)} · ${(remoto.righe || []).length} prodotti · € ${fmtEur(remoto.totale || 0)}`, remoto.id);
         cambiamenti = true;
       } else if ((remoto.updatedAt || '') > (locale.updatedAt || '')) {
+        const eraConfermato = locale.stato === 'programmato' || remoto.modificatoDaConfermato;
         Object.assign(locale, remoto);
         const cli = data.clienti.find(c => c.id === remoto.clienteId);
         const nomeCliente = cli ? (cli.ragioneSociale || cli.nome) : 'Cliente';
-        addNotifica('modifica-ordine', 'Ordine modificato da ' + nomeCliente, `Ordine #${remoto.numero || remoto.id.slice(-6)} aggiornato`, remoto.id);
+        const titolo = eraConfermato
+          ? '⚠ Ordine confermato MODIFICATO da ' + nomeCliente
+          : 'Ordine modificato da ' + nomeCliente;
+        const messaggio = eraConfermato
+          ? `Ordine #${remoto.numero || remoto.id.slice(-6)} precedentemente confermato è stato modificato. Da riconfermare.`
+          : `Ordine #${remoto.numero || remoto.id.slice(-6)} aggiornato`;
+        addNotifica('modifica-ordine', titolo, messaggio, remoto.id);
         cambiamenti = true;
       }
     }
@@ -1854,6 +1888,7 @@ function getPrezzoCliente(clienteId, prodottoId, quantita) {
   const prodotto = data.prodotti.find(p => p.id === prodottoId);
   if (!prodotto) return 0;
 
+  // 1. Listino specifico del cliente
   if (cliente && Array.isArray(cliente.listino)) {
     const voce = cliente.listino.find(v => v.prodottoId === prodottoId);
     if (voce && Array.isArray(voce.scaglioni) && voce.scaglioni.length > 0) {
@@ -1865,6 +1900,16 @@ function getPrezzoCliente(clienteId, prodottoId, quantita) {
       if (prezzo != null) return Number(prezzo) || 0;
     }
   }
+  // 2. Scaglioni default del prodotto
+  if (Array.isArray(prodotto.scaglioniDefault) && prodotto.scaglioniDefault.length > 0) {
+    const sortati = [...prodotto.scaglioniDefault].sort((a, b) => (a.minQta || 0) - (b.minQta || 0));
+    let prezzo = null;
+    for (const s of sortati) {
+      if (qta >= (s.minQta || 0)) prezzo = s.prezzo;
+    }
+    if (prezzo != null) return Number(prezzo) || 0;
+  }
+  // 3. Prezzo default del prodotto
   return Number(prodotto.prezzoDefault) || 0;
 }
 
@@ -2019,7 +2064,6 @@ function render() {
     case 'guida': main.innerHTML = renderGuida(); break;
     case 'sync': main.innerHTML = renderSync(); break;
     case 'dati': main.innerHTML = renderDati(); break;
-    case 'catalogo': main.innerHTML = renderCatalogo(); break;
     case 'notifiche': main.innerHTML = renderNotifiche(); break;
   }
   updateGistBanner();
@@ -2518,30 +2562,33 @@ function renderProdotti() {
             <th>Nome</th>
             <th>Peso (g)</th>
             <th>Pz/cartone</th>
-            <th>TMC (mesi)</th>
-            <th>Prezzo default</th>
-            <th>IVA</th>
+            <th>Prezzo</th>
+            <th>Scaglioni</th>
+            <th>Visibile</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          ${data.prodotti.map(p => `
-            <tr>
-              <td class="mono"><strong>${escapeHtml(p.codice)}</strong></td>
-              <td>${escapeHtml(p.nome)}</td>
-              <td>${p.pesoPezzo}</td>
-              <td>${p.pezziCartone}</td>
-              <td>${p.tmcMesi}</td>
-              <td><strong>${fmtEur(p.prezzoDefault || 0)}</strong></td>
-              <td>${p.aliquotaIva ?? 10}%</td>
-              <td>
-                <div class="table-actions">
-                  <button class="btn btn--ghost btn--small" onclick="openProdottoModal('${p.id}')">Mod.</button>
-                  <button class="btn btn--danger btn--small" onclick="deleteProdotto('${p.id}')">×</button>
-                </div>
-              </td>
-            </tr>
-          `).join('')}
+          ${data.prodotti.map(p => {
+            const nScaglioni = Array.isArray(p.scaglioniDefault) ? p.scaglioniDefault.length : 0;
+            return `
+              <tr>
+                <td class="mono"><strong>${escapeHtml(p.codice)}</strong></td>
+                <td>${escapeHtml(p.nome)}</td>
+                <td>${p.pesoPezzo}</td>
+                <td>${p.pezziCartone}</td>
+                <td><strong>€ ${fmtEur(p.prezzoDefault || 0)}</strong></td>
+                <td>${nScaglioni > 0 ? `<span class="pill pill--blue">${nScaglioni} scaglion${nScaglioni===1?'e':'i'}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+                <td>${p.disponibile === false ? '<span class="pill" style="background:var(--grey-light);color:var(--muted)">Nascosto</span>' : '<span class="pill pill--green">Sì</span>'}</td>
+                <td>
+                  <div class="table-actions">
+                    <button class="btn btn--ghost btn--small" onclick="openProdottoModal('${p.id}')">Mod.</button>
+                    <button class="btn btn--danger btn--small" onclick="deleteProdotto('${p.id}')">×</button>
+                  </div>
+                </td>
+              </tr>
+            `;
+          }).join('')}
         </tbody>
       </table>
     </div>
@@ -2550,6 +2597,7 @@ function renderProdotti() {
 
 function openProdottoModal(id) {
   const p = id ? data.prodotti.find(x => x.id === id) : null;
+  if (id && p && !Array.isArray(p.scaglioniDefault)) p.scaglioniDefault = [];
   showModal({
     title: p ? 'Modifica prodotto' : 'Nuovo prodotto',
     body: `
@@ -2580,7 +2628,7 @@ function openProdottoModal(id) {
           <div class="field">
             <label class="field-label">Prezzo default (€/pz)</label>
             <input type="number" class="field-input" name="prezzoDefault" value="${p?.prezzoDefault ?? 0}" min="0" step="0.01" inputmode="decimal">
-            <div class="field-help">Modificabile per ciascun cliente nel listino</div>
+            <div class="field-help">Usato se non ci sono scaglioni o listini personalizzati</div>
           </div>
           <div class="field">
             <label class="field-label">Aliquota IVA (%)</label>
@@ -2591,6 +2639,29 @@ function openProdottoModal(id) {
               <option value="0" ${p?.aliquotaIva===0?'selected':''}>0% (esente)</option>
             </select>
           </div>
+          <div class="field field--full">
+            <label class="field-label">Descrizione (visibile ai clienti)</label>
+            <textarea class="field-textarea" name="descrizione" rows="2" placeholder="Es: cornetto sfogliato preparato con burro francese...">${escapeHtml(p?.descrizione || '')}</textarea>
+          </div>
+          <div class="field field--full">
+            <label class="field-label">Immagine prodotto (URL, opzionale)</label>
+            <input type="url" class="field-input" name="immagine" value="${escapeHtml(p?.immagine || '')}" placeholder="https://...">
+            <div class="field-help">Mostrata nel catalogo dell'app cliente</div>
+          </div>
+          <div class="field">
+            <label class="field-label">Visibile ai clienti</label>
+            <select class="field-select" name="disponibile">
+              <option value="true" ${(p?.disponibile !== false) ? 'selected' : ''}>Sì, mostra nell'app cliente</option>
+              <option value="false" ${p?.disponibile === false ? 'selected' : ''}>No, nascondi ai clienti</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:18px;background:var(--light-bg)">
+          <div class="card-h">📊 Scaglioni di prezzo per quantità (default prodotto)</div>
+          <p style="color:var(--muted);font-size:13px;margin-bottom:10px">Definisci scaglioni di prezzo in base alla quantità ordinata. Vengono usati come default se il cliente non ha un listino personalizzato. Se vuoti, si usa solo il <em>Prezzo default</em>.</p>
+          <div id="scagliDefaultList" style="display:grid;gap:8px"></div>
+          <button type="button" class="btn btn--ghost btn--small" style="margin-top:10px" onclick="aggiungiScaglioneDefault('${id || ''}')">+ Aggiungi scaglione</button>
         </div>
       </form>
     `,
@@ -2599,6 +2670,57 @@ function openProdottoModal(id) {
       <button class="btn btn--amber" onclick="saveProdotto('${id || ''}')">${p ? 'Salva' : 'Aggiungi'}</button>
     `
   });
+  prodScaglioniDraft = p && Array.isArray(p.scaglioniDefault) ? JSON.parse(JSON.stringify(p.scaglioniDefault)) : [];
+  renderScaglioniDefault();
+}
+
+let prodScaglioniDraft = [];
+
+function renderScaglioniDefault() {
+  const el = document.getElementById('scagliDefaultList');
+  if (!el) return;
+  if (!prodScaglioniDraft.length) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:8px 0">Nessuno scaglione definito · si usa il prezzo default.</div>';
+    return;
+  }
+  const sortati = [...prodScaglioniDraft].sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+  el.innerHTML = sortati.map((s, idx) => `
+    <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+      <div class="field" style="margin:0">
+        <label class="field-label" style="font-size:11px">Da quantità (pz)</label>
+        <input type="number" class="field-input" value="${s.minQta || 0}" min="0" step="1" inputmode="numeric"
+          onchange="aggiornaScaglioneDefault(${idx},'minQta',this.value)">
+      </div>
+      <div class="field" style="margin:0">
+        <label class="field-label" style="font-size:11px">Prezzo (€/pz)</label>
+        <input type="number" class="field-input" value="${s.prezzo || 0}" min="0" step="0.01" inputmode="decimal"
+          onchange="aggiornaScaglioneDefault(${idx},'prezzo',this.value)">
+      </div>
+      <button type="button" class="btn btn--danger btn--small" onclick="rimuoviScaglioneDefault(${idx})">×</button>
+    </div>
+  `).join('');
+}
+
+function aggiungiScaglioneDefault() {
+  const ultimo = prodScaglioniDraft.length ? prodScaglioniDraft.reduce((m,s)=>Math.max(m, s.minQta||0), 0) : 0;
+  const nextMin = ultimo > 0 ? ultimo + 1 : 1;
+  prodScaglioniDraft.push({ minQta: nextMin, prezzo: 0 });
+  renderScaglioniDefault();
+}
+
+function aggiornaScaglioneDefault(idx, campo, valore) {
+  const sortati = [...prodScaglioniDraft].sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+  const target = sortati[idx];
+  if (!target) return;
+  const realIdx = prodScaglioniDraft.indexOf(target);
+  prodScaglioniDraft[realIdx][campo] = parseFloat(valore) || 0;
+}
+
+function rimuoviScaglioneDefault(idx) {
+  const sortati = [...prodScaglioniDraft].sort((a,b)=>(a.minQta||0)-(b.minQta||0));
+  const target = sortati[idx];
+  prodScaglioniDraft = prodScaglioniDraft.filter(s => s !== target);
+  renderScaglioniDefault();
 }
 
 function saveProdotto(id) {
@@ -2613,7 +2735,14 @@ function saveProdotto(id) {
   p.tmcMesi = parseInt(fd.get('tmcMesi'));
   p.prezzoDefault = parseFloat(fd.get('prezzoDefault')) || 0;
   p.aliquotaIva = parseInt(fd.get('aliquotaIva'));
+  p.descrizione = (fd.get('descrizione') || '').trim();
+  p.immagine = (fd.get('immagine') || '').trim();
+  p.disponibile = fd.get('disponibile') !== 'false';
+  p.scaglioniDefault = prodScaglioniDraft
+    .filter(s => s && (s.minQta > 0 || s.prezzo > 0))
+    .map(s => ({ minQta: parseInt(s.minQta) || 0, prezzo: parseFloat(s.prezzo) || 0 }));
   saveData();
+  gistUploadCatalogoOrdiniClienti();
   closeModal();
   render();
   toast(id ? 'Prodotto aggiornato' : 'Prodotto creato');
@@ -2817,9 +2946,9 @@ function renderClienti() {
                 <td>${escapeHtml(c.telefono || '—')}</td>
                 <td>
                   <div class="table-actions">
+                    <button class="btn btn--amber btn--small" onclick="event.stopPropagation();inviaLinkWhatsApp('${c.id}')" title="Invia link app cliente via WhatsApp">📲 Link app</button>
                     <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();apriCliente('${c.id}')">Apri</button>
                     <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();openClienteModal('${c.id}')">Mod.</button>
-                    <button class="btn btn--ghost btn--small" onclick="event.stopPropagation();generaLinkCliente('${c.id}')" title="Genera link app cliente">🔗</button>
                     <button class="btn btn--danger btn--small" onclick="event.stopPropagation();deleteCliente('${c.id}')">×</button>
                   </div>
                 </td>
@@ -4558,6 +4687,20 @@ function renderClienteDettaglio(clienteId) {
       <button class="btn btn--ghost" onclick="openClienteModal('${c.id}')">Modifica anagrafica</button>
     </div>
 
+    <div class="card" style="margin-bottom:20px;background:linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);color:#fff;border:none">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <div style="font-size:42px;line-height:1">📲</div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:18px;font-weight:700;margin-bottom:4px">App ordini per ${escapeHtml(c.ragioneSociale || c.nome || 'cliente')}</div>
+          <div style="opacity:0.9;font-size:14px;line-height:1.4">Condividi un link personalizzato: il cliente può fare ordini in autonomia dal suo telefono.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn--amber" onclick="inviaLinkWhatsApp('${c.id}')" style="font-size:15px;padding:12px 18px">📲 Invia su WhatsApp</button>
+          <button class="btn btn--ghost" onclick="generaLinkCliente('${c.id}')" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3)">📋 Copia / Anteprima</button>
+        </div>
+      </div>
+    </div>
+
     <div class="kpi-grid">
       <div class="kpi"><div class="kpi-label">Fatturato ${annoCorr}</div><div class="kpi-value">${fmtEur(fatturatoAnno)}</div></div>
       <div class="kpi kpi--blue"><div class="kpi-label">DDT totali</div><div class="kpi-value">${ddtCliente.length}</div><div class="kpi-detail">${fattureCliente.length} fatture</div></div>
@@ -4899,130 +5042,6 @@ function deleteHaccp(id) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   PAGE: CATALOGO CLIENTE
-   ════════════════════════════════════════════════════════════════════ */
-function renderCatalogo() {
-  const catalogo = data.catalogo || [];
-  const gistConnesso = data.config.gistSync.enabled;
-  return `
-    <div class="page-header">
-      <div>
-        <div class="page-title">Catalogo cliente</div>
-        <div class="page-subtitle">Prodotti che i clienti vedono dall'app di ordine</div>
-      </div>
-      <button class="btn btn--amber" onclick="openCatalogoModal('')">+ Nuovo prodotto</button>
-    </div>
-
-    ${!gistConnesso ? `
-      <div class="banner banner--amber">
-        <div class="banner-icon">⚠</div>
-        <div class="banner-content">
-          <div class="banner-title">Sync GitHub Gist non configurato</div>
-          <div>Il catalogo viene pubblicato sul cloud tramite GitHub Gist. Configura il sync nella sezione <strong>Sincronizzazione</strong> per renderlo visibile ai clienti.</div>
-        </div>
-      </div>
-    ` : ''}
-
-    ${catalogo.length === 0 ? `
-      <div class="empty">
-        <div class="empty-icon">📋</div>
-        <div class="empty-text">Nessun prodotto a catalogo</div>
-        <div class="empty-hint">Aggiungi i prodotti che vuoi rendere ordinabili dai tuoi clienti</div>
-      </div>
-    ` : `
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px">
-        ${catalogo.map(p => `
-          <div class="card" style="position:relative">
-            ${p.attivo === false ? '<div style="position:absolute;top:8px;right:8px;background:var(--grey-light);color:var(--muted);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">DISATTIVATO</div>' : ''}
-            ${p.immagine ? `<img src="${escapeHtml(p.immagine)}" style="width:100%;height:140px;object-fit:cover;border-radius:8px;margin-bottom:8px" onerror="this.style.display='none'">` : ''}
-            <div style="font-weight:700;font-size:16px;margin-bottom:4px">${escapeHtml(p.nome)}</div>
-            <div style="color:var(--amber);font-weight:700;font-size:18px">€ ${fmtEur(p.prezzo)}</div>
-            ${p.descrizione ? `<div style="color:var(--muted);font-size:13px;margin-top:8px;line-height:1.4">${escapeHtml(p.descrizione)}</div>` : ''}
-            <div style="display:flex;gap:6px;margin-top:12px">
-              <button class="btn btn--ghost btn--small" onclick="openCatalogoModal('${p.id}')" style="flex:1">Modifica</button>
-              <button class="btn btn--ghost btn--small" onclick="deleteCatalogoProdotto('${p.id}')" style="color:var(--red)">Elimina</button>
-            </div>
-          </div>
-        `).join('')}
-      </div>
-    `}
-  `;
-}
-
-function openCatalogoModal(id) {
-  const p = (data.catalogo || []).find(x => x.id === id) || { id: '', nome: '', prezzo: 0, descrizione: '', immagine: '', attivo: true };
-  showModal({
-    title: id ? 'Modifica prodotto' : 'Nuovo prodotto a catalogo',
-    body: `
-      <form id="catalogoForm">
-        <div class="form-grid">
-          <div class="field" style="grid-column:span 2">
-            <label class="field-label">Nome prodotto *</label>
-            <input type="text" class="field-input" name="nome" value="${escapeHtml(p.nome)}" required>
-          </div>
-          <div class="field">
-            <label class="field-label">Prezzo (€) *</label>
-            <input type="number" class="field-input" name="prezzo" value="${p.prezzo}" step="0.01" min="0" required>
-          </div>
-          <div class="field">
-            <label class="field-label">Disponibile</label>
-            <select class="field-input" name="attivo">
-              <option value="true" ${p.attivo !== false ? 'selected' : ''}>Sì, visibile ai clienti</option>
-              <option value="false" ${p.attivo === false ? 'selected' : ''}>No, nascosto</option>
-            </select>
-          </div>
-          <div class="field" style="grid-column:span 2">
-            <label class="field-label">Immagine (URL)</label>
-            <input type="url" class="field-input" name="immagine" value="${escapeHtml(p.immagine || '')}" placeholder="https://...">
-          </div>
-          <div class="field" style="grid-column:span 2">
-            <label class="field-label">Descrizione</label>
-            <textarea class="field-input" name="descrizione" rows="3" placeholder="Breve descrizione del prodotto">${escapeHtml(p.descrizione || '')}</textarea>
-          </div>
-        </div>
-        <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
-          <button type="button" class="btn btn--ghost" onclick="closeModal()">Annulla</button>
-          <button type="submit" class="btn btn--amber">Salva</button>
-        </div>
-      </form>
-    `
-  });
-  document.getElementById('catalogoForm').onsubmit = (e) => {
-    e.preventDefault();
-    const f = new FormData(e.target);
-    const prod = {
-      id: id || ('cat-' + uid()),
-      nome: f.get('nome'),
-      prezzo: parseFloat(f.get('prezzo')) || 0,
-      descrizione: f.get('descrizione') || '',
-      immagine: f.get('immagine') || '',
-      attivo: f.get('attivo') === 'true',
-    };
-    if (!data.catalogo) data.catalogo = [];
-    if (id) {
-      const idx = data.catalogo.findIndex(x => x.id === id);
-      if (idx >= 0) data.catalogo[idx] = prod;
-    } else {
-      data.catalogo.push(prod);
-    }
-    saveData();
-    gistUploadCatalogoOrdiniClienti();
-    closeModal();
-    render();
-    toast(id ? 'Prodotto aggiornato' : 'Prodotto aggiunto al catalogo', 'success');
-  };
-}
-
-function deleteCatalogoProdotto(id) {
-  if (!confirm('Eliminare questo prodotto dal catalogo?')) return;
-  data.catalogo = (data.catalogo || []).filter(p => p.id !== id);
-  saveData();
-  gistUploadCatalogoOrdiniClienti();
-  render();
-  toast('Prodotto eliminato', 'info');
-}
-
-/* ════════════════════════════════════════════════════════════════════
    PAGE: NOTIFICHE IN-APP
    ════════════════════════════════════════════════════════════════════ */
 function renderNotifiche() {
@@ -5319,7 +5338,7 @@ function renderGuida() {
       <div class="info-box">
         <div class="info-box-title">Come funziona</div>
         <ol>
-          <li>Vai in <strong>Catalogo cliente</strong> e aggiungi i prodotti che vuoi rendere ordinabili</li>
+          <li>In <strong>Prodotti</strong>, per ogni prodotto: imposta <strong>prezzo</strong>, <strong>foto</strong>, <strong>descrizione</strong> e <strong>scaglioni quantità</strong>. Marca come <strong>Visibile ai clienti</strong> i prodotti che vuoi rendere ordinabili</li>
           <li>Vai in <strong>Clienti</strong>, sulla riga del cliente click sull'icona <strong>🔗</strong></li>
           <li>Si apre una finestra con il link → click <strong>"Invia con WhatsApp"</strong> per condividerlo</li>
           <li>Il cliente apre il link sul telefono → può <strong>aggiungere l'app alla home</strong> (icona sul telefono)</li>
