@@ -1,0 +1,97 @@
+{
+  "meta": {
+    "title": "MADIA — Il lusso silenzioso del pane caldo",
+    "description": "Artigianalità italiana. Una scatola di legno che custodisce e scalda il pane in silenzio. Per superyacht, jet privati, ville e suite di alta gamma."
+  },
+  "switcher": {
+    "ariaLabel": "Cambia lingua"
+  },
+  "hero": {
+    "wordmark": "MADIA",
+    "tagline": "Il lusso silenzioso del pane caldo",
+    "scroll": "SCROLL"
+  },
+  "emotion": {
+    "eyebrow": "I.  L'EMOZIONE",
+    "titleStart": "Innanzitutto,",
+    "titleEnd": "un silenzio.",
+    "p1": "C'è un momento, a bordo, che non si compra con nessun accessorio: quello in cui qualcuno apre una scatola di legno e da dentro sale il profumo del pane caldo. Non il suono di un timer. Non la luce di un display. Solo calore, silenzio, e un gesto antico che torna a sorprendere.",
+    "p2": "MADIA nasce esattamente da quel momento. Non per replicarlo, ma per <em>custodirlo</em> — e restituirlo, ogni volta, con la stessa disarmante semplicità.",
+    "quoteLine1": "Il lusso più raro non fa rumore.",
+    "quoteLine2": "Si sente."
+  },
+  "sense": {
+    "eyebrow": "II.  IL SENSO",
+    "titleStart": "Un mobile antico.",
+    "titleEnd": "Un rituale moderno.",
+    "originLabel": "L'origine",
+    "origin1": "Nel Quattrocento, ogni casa italiana aveva una <em>madia</em>. Non era un elettrodomestico, né un mobile decorativo. Era un oggetto domestico: silenzioso, funzionale, necessario. Custodiva la farina, accoglieva l'impasto, proteggeva il pane.",
+    "origin2": "Cinque secoli dopo, quel gesto manca. Non perché il mondo sia peggiorato, ma perché ha accelerato. Su un superyacht moderno, in un hotel a cinque stelle, in una villa privata sul lago — ovunque il lusso sia diventato architettura, design, servizio — il pane arriva ancora freddo.",
+    "answerLabel": "La risposta",
+    "answer": "MADIA non porta il pane al calore. Porta il calore al pane. Una reinterpretazione contemporanea di quel mobile italiano antico: un oggetto in legno pregiato, riscaldato in silenzio, capace di custodire e mantenere caldi pane, viennoiserie e bakery — senza trasformare un rituale in una procedura tecnica.",
+    "pull": "Non un elettrodomestico. Un oggetto di casa. Ovunque la casa sia."
+  },
+  "scenes": {
+    "eyebrow": "III.  SCENE D'USO",
+    "titleStart": "Il calore del pane,",
+    "titleEnd": "ovunque.",
+    "items": [
+      {
+        "numeral": "I.",
+        "title": "A bordo · colazione sul mare",
+        "body": "Il sole è ancora basso. Il mare è piatto. Il chief stew porta in coperta una scatola di legno calda. Gli ospiti non chiedono nulla — capiscono. I croissant sono caldi esattamente come dovrebbero essere. Nessuna fretta. Nessun rumore. Solo un gesto.",
+        "alt": "Scatola MADIA di legno aperta sul ponte di uno yacht all'alba, con croissant caldi all'interno"
+      },
+      {
+        "numeral": "II.",
+        "title": "In villa · la colazione servita",
+        "body": "La cucina è quieta. Lo chef prepara, dispone, apparecchia. MADIA è già sul tavolo, chiusa. Quando si apre, la stanza si riempie di un profumo familiare. Non è un effetto teatrale: è semplicemente la colazione come dovrebbe essere.",
+        "alt": "Scatola MADIA su un tavolo da colazione in una villa sul lago, luce del mattino"
+      },
+      {
+        "numeral": "III.",
+        "title": "In suite · attenzione al dettaglio",
+        "body": "Chi gestisce una suite di alta gamma sa che gli ospiti non ricordano le specifiche tecniche. Ricordano le sensazioni. MADIA è uno di quei dettagli che restano — non perché sia insolito, ma perché è ricco.",
+        "alt": "Scatola MADIA su un tavolo da colazione discreto in una suite di un hotel a cinque stelle"
+      },
+      {
+        "numeral": "IV.",
+        "title": "In jet privato · il servizio come gesto",
+        "body": "Il pane non arriva in un cestino. Arriva in una scatola di legno, portata al tavolo, aperta davanti all'ospite. È un gesto di attenzione che non ha bisogno di spiegazioni. Parla da solo.",
+        "alt": "Scatola MADIA aperta davanti a un ospite a bordo di una cabina di jet privato"
+      }
+    ]
+  },
+  "roots": {
+    "eyebrow": "IV.  RADICI",
+    "titleStart": "La tradizione del pane,",
+    "titleEnd": "reinventata.",
+    "p1": "MADIA è un prodotto italiano non per strategia di marketing, ma per necessità culturale. Non sarebbe potuta nascere altrove: la cultura del pane, l'arte della lavorazione del legno, la metallurgia, l'attenzione ai materiali come forma di rispetto — sono elementi di una tradizione specifica che non si può simulare.",
+    "pull": "Dal Quattrocento, ovunque.",
+    "p2": "Gli artigiani che realizzano MADIA lavorano il legno, il metallo e il tempo con la stessa logica con cui si costruisce qualcosa destinato a durare. La produzione limitata non è uno slogan: è una conseguenza diretta di questo approccio. Ogni pezzo richiede attenzione, e l'attenzione non si scala."
+  },
+  "epilogue": {
+    "eyebrow": "V.  EPILOGO",
+    "titleStart": "Cinquecento anni fa, la",
+    "titleMid": "madia",
+    "titleEnd": "custodiva il pane.",
+    "subtitleStart": "Oggi, MADIA custodisce qualcosa di ancora più raro:",
+    "subtitleEnd": "il tempo, il calore e il silenzio.",
+    "quote": "In un mondo che corre, produce e ottimizza, c'è ancora spazio per un oggetto che sta semplicemente lì, in silenzio, a fare una sola cosa, bene.",
+    "wordmark": "MADIA",
+    "tagline": "Il lusso silenzioso del pane caldo."
+  },
+  "inquiry": {
+    "eyebrow": "RICHIESTA PRIVATA",
+    "title": "Riservato a pochi.",
+    "subtitle": "Raccontateci dove vivrà MADIA. Risponderemo personalmente.",
+    "name": "Nome",
+    "email": "Email",
+    "message": "Messaggio",
+    "submit": "INVIA RICHIESTA",
+    "sending": "INVIO IN CORSO",
+    "success": "Grazie. Vi risponderemo personalmente.",
+    "error": "Qualcosa è andato storto. Scriveteci direttamente a madiabox@gmail.com",
+    "contact": "madiabox@gmail.com"
+  }
+}

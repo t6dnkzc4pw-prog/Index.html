@@ -1,0 +1,97 @@
+{
+  "meta": {
+    "title": "MADIA — The silent luxury of warm bread",
+    "description": "Handcrafted in Italy. A wooden box that silently preserves and warms bread. For superyachts, private jets, villas, and high-end suites."
+  },
+  "switcher": {
+    "ariaLabel": "Change language"
+  },
+  "hero": {
+    "wordmark": "MADIA",
+    "tagline": "The silent luxury of warm bread",
+    "scroll": "SCROLL"
+  },
+  "emotion": {
+    "eyebrow": "I.  THE EMOTION",
+    "titleStart": "First of all,",
+    "titleEnd": "a silence.",
+    "p1": "There is a moment, on board, that cannot be purchased with any accessory: the one in which someone opens a wooden box and the scent of warm bread rises from within. Not the sound of a timer. Not the glow of a display. Just warmth, silence, and an ancient gesture returning to surprise.",
+    "p2": "MADIA is born from exactly that moment. Not to replicate it, but to <em>preserve</em> it — and return it, every time, with the same disarming simplicity.",
+    "quoteLine1": "The rarest luxury makes no noise.",
+    "quoteLine2": "It is felt."
+  },
+  "sense": {
+    "eyebrow": "II.  THE SENSE",
+    "titleStart": "An ancient piece of furniture.",
+    "titleEnd": "A modern ritual.",
+    "originLabel": "The origin",
+    "origin1": "In the 15th century, every Italian home had a <em>madia</em>. It was not an appliance, nor decorative furniture. It was a household object: silent, functional, necessary. It stored the flour, received the dough, protected the bread.",
+    "origin2": "Five centuries later, that gesture is missing. Not because the world has worsened, but because it has accelerated. On a modern superyacht, in a five-star hotel, in a private lakeside villa — wherever luxury has become architecture, design, service — the bread still arrives cold.",
+    "answerLabel": "The answer",
+    "answer": "MADIA does not bring the bread to the warmth. It brings the warmth to the bread. A contemporary reinterpretation of that ancient Italian piece of furniture: an object in fine wood, silently heated, capable of preserving and keeping warm bread, viennoiserie and bakery — without turning a ritual into a technical procedure.",
+    "pull": "Not an appliance. A home object. Wherever home may be."
+  },
+  "scenes": {
+    "eyebrow": "III.  SCENES OF USE",
+    "titleStart": "The warmth of bread,",
+    "titleEnd": "everywhere.",
+    "items": [
+      {
+        "numeral": "I.",
+        "title": "On board · breakfast at sea",
+        "body": "The sun is still low. The sea is flat. The chief stew carries a warm wooden box up on deck. The guests ask nothing — they understand. The croissants are warm exactly as they should be. No rush. No noise. Just a gesture.",
+        "alt": "Wooden MADIA box opened on a yacht deck at sunrise, with warm croissants inside"
+      },
+      {
+        "numeral": "II.",
+        "title": "In the villa · the served breakfast",
+        "body": "The kitchen is quiet. The chef prepares, arranges, sets. MADIA is already on the table, closed. When it opens, the room fills with a familiar scent. It is not a theatrical effect: it is simply breakfast as it should be.",
+        "alt": "MADIA wooden box on a lakeside villa breakfast table at morning light"
+      },
+      {
+        "numeral": "III.",
+        "title": "In the suite · attention to detail",
+        "body": "Anyone managing a high-end suite knows that guests do not remember technical specifications. They remember sensations. MADIA is one of those details that stay — not because it is unusual, but because it is rich.",
+        "alt": "MADIA wooden box on a quiet suite breakfast table in a five-star hotel"
+      },
+      {
+        "numeral": "IV.",
+        "title": "In the private jet · service as gesture",
+        "body": "The bread does not arrive in a basket. It arrives in a wooden box, carried to the table, opened in front of the guest. It is a gesture of attention that requires no explanation. It speaks for itself.",
+        "alt": "MADIA wooden box being opened in front of a guest aboard a private jet cabin"
+      }
+    ]
+  },
+  "roots": {
+    "eyebrow": "IV.  ROOTS",
+    "titleStart": "The tradition of bread,",
+    "titleEnd": "reinvented.",
+    "p1": "MADIA is an Italian product not as a marketing strategy, but out of cultural necessity. It could not have been born anywhere else: the culture of bread, the craft of woodworking, the metalwork, the attention to materials as a form of respect — these are elements of a specific tradition that cannot be simulated.",
+    "pull": "Since the 15th century, everywhere.",
+    "p2": "The artisans who make MADIA work wood, metal and time with the same logic used to build something that is meant to last. Limited production is not a slogan: it is a direct consequence of this approach. Every piece requires attention, and attention cannot be scaled."
+  },
+  "epilogue": {
+    "eyebrow": "V.  EPILOGUE",
+    "titleStart": "Five hundred years ago, the",
+    "titleMid": "madia",
+    "titleEnd": "preserved the bread.",
+    "subtitleStart": "Today, MADIA preserves something even rarer:",
+    "subtitleEnd": "time, warmth, and silence.",
+    "quote": "In a world that rushes, produces and optimizes, there is still room for an object that simply sits there, in silence, doing just one thing, beautifully.",
+    "wordmark": "MADIA",
+    "tagline": "The silent luxury of warm bread."
+  },
+  "inquiry": {
+    "eyebrow": "PRIVATE INQUIRY",
+    "title": "Reserved for a few.",
+    "subtitle": "Tell us where MADIA will live. We will respond personally.",
+    "name": "Name",
+    "email": "Email",
+    "message": "Message",
+    "submit": "SUBMIT REQUEST",
+    "sending": "SENDING",
+    "success": "Thank you. We will be in touch.",
+    "error": "Something went wrong. Please write us directly at madiabox@gmail.com",
+    "contact": "madiabox@gmail.com"
+  }
+}
