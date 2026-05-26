@@ -1890,6 +1890,83 @@ async function ensureNotificationPermission(silent) {
   catch(_) { return false; }
 }
 
+function subscribeNtfyOnDevice() {
+  const topic = ntfyTopic();
+  if (!topic) { toast('Topic non configurato', 'error'); return; }
+  const ua = navigator.userAgent || '';
+  const isMobile = /Android|iPhone|iPad|iPod/.test(ua);
+  if (isMobile) {
+    // 1° tentativo: deep link app ntfy (apre l'app se installata)
+    const deepLink = `ntfy://subscribe?topic=${encodeURIComponent(topic)}`;
+    const webLink = `https://ntfy.sh/${encodeURIComponent(topic)}`;
+    const iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = deepLink;
+    document.body.appendChild(iframe);
+    // Fallback dopo 1.5s: apri la pagina web (che propone il download app se non installata)
+    setTimeout(() => {
+      try { document.body.removeChild(iframe); } catch(_) {}
+      window.open(webLink, '_blank');
+    }, 1500);
+  } else {
+    // Desktop: apri direttamente la web app ntfy
+    window.open(`https://ntfy.sh/${encodeURIComponent(topic)}`, '_blank');
+  }
+}
+
+function copiaTopicNtfy() {
+  const topic = ntfyTopic();
+  if (!topic) { toast('Topic non configurato', 'error'); return; }
+  navigator.clipboard.writeText(topic).then(() => {
+    toast('Topic copiato: ' + topic, 'success', 4000);
+  }).catch(() => {
+    prompt('Copia questo topic e incollalo nell\'app ntfy:', topic);
+  });
+}
+
+function mostraIstruzioniNtfy() {
+  const topic = ntfyTopic() || '(non disponibile)';
+  showModal({
+    title: '📲 Setup notifiche di sistema',
+    body: `
+      <p style="font-size:14px;line-height:1.6;margin-bottom:14px">
+        L'app del panificio ti mostra le notifiche solo quando è aperta. Per ricevere notifiche di sistema sul telefono <strong>anche con app chiusa</strong>, usa l'app gratuita <strong>ntfy</strong>.
+      </p>
+      <ol style="font-size:14px;line-height:1.8;margin-left:20px;margin-bottom:14px">
+        <li>Scarica l'app <strong>ntfy</strong> dallo store:<br>
+          🍎 <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank">App Store (iPhone)</a><br>
+          🤖 <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank">Google Play (Android)</a>
+        </li>
+        <li>Apri l'app ntfy → tocca <strong>+</strong> (in basso)</li>
+        <li>Incolla il topic: <code style="background:var(--light-bg);padding:2px 6px;border-radius:4px;font-size:12px">${escapeHtml(topic)}</code></li>
+        <li>Salva → da ora ricevi notifiche native a ogni nuovo ordine</li>
+      </ol>
+      <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:14px">
+        <strong>Privacy</strong>: il topic è un ID casuale impossibile da indovinare. Solo chi lo conosce può vedere le notifiche. ntfy.sh è open source.<br>
+        <strong>Costo</strong>: gratis, sempre.
+      </p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn--ghost" onclick="closeModal()">Chiudi</button>
+        <button class="btn btn--amber" onclick="closeModal();subscribeNtfyOnDevice()">📲 Apri app ntfy</button>
+      </div>
+    `
+  });
+}
+
+function rigeneraTenantId() {
+  if (!confirm('⚠ Generare un nuovo canale di notifica?\n\nDopo la rigenerazione:\n• I link cliente già inviati NON triggereranno più notifiche\n• Dovrai rigenerare e reinviare tutti i link cliente\n• Dovrai re-iscriverti col nuovo topic nell\'app ntfy\n\nProcedere?')) return;
+  const nuovo = genTenantId();
+  data.config.tenantId = nuovo;
+  data.config.ntfyLastTs = 0;
+  saveData();
+  // Riavvia il WS con il nuovo topic
+  try { if (ntfyWs) ntfyWs.close(); } catch(_) {}
+  ntfyWs = null;
+  ntfyConnect();
+  toast('Nuovo canale generato. Rigenera i link cliente e reinviali.', 'success', 6000);
+  render();
+}
+
 async function attivaNotificheBrowser() {
   const ok = await ensureNotificationPermission(false);
   if (ok) {
@@ -5382,12 +5459,33 @@ function renderNotifiche() {
       </div>
     ` : ''}
 
+    <div class="card" style="background:linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);color:#fff;border:none;margin-bottom:20px">
+      <div style="font-size:17px;font-weight:700;margin-bottom:8px">📲 Notifiche di sistema (anche con app chiusa)</div>
+      <p style="font-size:13px;opacity:0.9;line-height:1.5;margin-bottom:14px">
+        Per ricevere notifiche sul telefono anche quando questa app è chiusa, installa l'app gratuita <strong>ntfy</strong> e iscriviti al canale del tuo panificio. È una configurazione di 2 minuti, una sola volta.
+      </p>
+      <div style="background:rgba(255,255,255,0.12);padding:10px 12px;border-radius:8px;font-family:monospace;font-size:13px;margin-bottom:12px;word-break:break-all">
+        <span style="opacity:0.7;font-size:11px">Il tuo canale:</span><br>
+        <strong>brioche-${escapeHtml(data.config.tenantId || 'non-configurato')}</strong>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn--amber" onclick="subscribeNtfyOnDevice()" style="flex:1;min-width:180px;justify-content:center">📲 Iscrivi questo dispositivo</button>
+        <button class="btn btn--ghost" onclick="copiaTopicNtfy()" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);min-width:120px;justify-content:center">📋 Copia topic</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px">
+        <a href="https://apps.apple.com/app/ntfy/id1625396347" target="_blank" style="color:#fff;opacity:0.85;text-decoration:underline">🍎 Scarica per iPhone</a>
+        <a href="https://play.google.com/store/apps/details?id=io.heckel.ntfy" target="_blank" style="color:#fff;opacity:0.85;text-decoration:underline">🤖 Scarica per Android</a>
+        <a href="#" onclick="mostraIstruzioniNtfy();return false;" style="color:#fff;opacity:0.85;text-decoration:underline;margin-left:auto">❓ Come funziona</a>
+      </div>
+    </div>
+
     <div class="card" style="background:var(--light-bg);margin-bottom:20px">
-      <div class="card-h">📲 Per ricevere notifiche anche con app chiusa</div>
+      <div class="card-h" style="font-size:14px">⚙️ Stato e diagnostica</div>
       <div style="font-size:13px;line-height:1.6;color:var(--muted)">
-        <p style="margin-bottom:8px"><strong>Su iPhone</strong>: apri questa app in Safari, tocca <strong>Condividi</strong> → <strong>Aggiungi a Home</strong>. Poi aprila SEMPRE dall'icona della home: solo così riceverai notifiche di sistema con l'app chiusa (richiede iOS 16.4+).</p>
-        <p style="margin-bottom:8px"><strong>Su Android</strong>: Chrome ti propone "Installa app" — accetta. Una volta installata, le notifiche di sistema funzionano anche con browser chiuso.</p>
-        <p><strong>Stato connessione real-time</strong>: <span id="ntfyConnStatus">⏳ in connessione...</span></p>
+        <p style="margin-bottom:6px"><strong>Sync real-time</strong>: <span id="ntfyConnStatus">⏳ in connessione...</span></p>
+        <p style="margin-bottom:6px"><strong>Notifiche browser (in-app)</strong>: ${notifPerm === 'granted' ? '🟢 attive' : notifPerm === 'denied' ? '🔴 negate' : '🟡 non ancora richieste'}</p>
+        <p style="margin-bottom:10px"><strong>Installato come PWA</strong>: ${window.matchMedia('(display-mode: standalone)').matches ? '🟢 sì (notifiche sistema ok)' : '🟡 no — usa Aggiungi a Home per notifiche complete'}</p>
+        <button class="btn btn--ghost btn--small" onclick="rigeneraTenantId()" style="color:var(--red)">🔄 Rigenera canale (i clienti vecchi smetteranno di triggerare notifiche)</button>
       </div>
     </div>
 
