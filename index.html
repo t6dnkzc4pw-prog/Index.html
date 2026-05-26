@@ -1749,8 +1749,37 @@ function copiaLinkCliente(url) {
    NTFY.SH — sync real-time ordini cliente → fornaio
    ════════════════════════════════════════════════════════════════════ */
 const NTFY_HOST = 'ntfy.sh';
+const NTFY_POLL_INTERVAL_MS = 15000;
 let ntfyWs = null;
 let ntfyReconnectTimer = null;
+let ntfyPollTimer = null;
+const ntfyProcessedIds = new Set();   // dedup tra WS e polling
+
+function startNtfyPolling() {
+  if (ntfyPollTimer) clearInterval(ntfyPollTimer);
+  ntfyPollTimer = setInterval(() => { recuperaOrdiniPersi().catch(() => {}); }, NTFY_POLL_INTERVAL_MS);
+}
+
+function stopNtfyPolling() {
+  if (ntfyPollTimer) { clearInterval(ntfyPollTimer); ntfyPollTimer = null; }
+}
+
+function ntfyConnState() {
+  if (ntfyWs && ntfyWs.readyState === 1) return 'connected';
+  if (ntfyPollTimer) return 'polling';
+  return 'offline';
+}
+
+function updateNtfyStatusUI() {
+  const el = document.getElementById('ntfyConnStatus');
+  if (!el) return;
+  const s = ntfyConnState();
+  const lastTs = data.config.ntfyLastTs;
+  const lastFmt = lastTs ? new Date(lastTs).toLocaleTimeString('it-IT') : 'mai';
+  if (s === 'connected') el.innerHTML = `🟢 Connesso in real-time · ultimo check: ${lastFmt}`;
+  else if (s === 'polling') el.innerHTML = `🟡 Modalità polling ogni 15s · ultimo check: ${lastFmt}`;
+  else el.innerHTML = `🔴 Disconnesso · ultimo check: ${lastFmt}`;
+}
 
 function ntfyTopic() {
   const t = data.config.tenantId;
@@ -1781,7 +1810,9 @@ function ntfyConnect() {
   ntfyWs.onclose = () => {
     ntfyWs = null;
     ntfyReconnectTimer = setTimeout(ntfyConnect, 5000);
+    updateNtfyStatusUI();
   };
+  ntfyWs.onopen = () => { updateNtfyStatusUI(); };
   ntfyWs.onerror = () => { try { ntfyWs.close(); } catch(_) {} };
 }
 
@@ -1812,9 +1843,20 @@ async function recuperaOrdiniPersi() {
 function handleNtfyPayload(payload, isCatchup) {
   if (!payload || payload.type !== 'nuovo-ordine' || !payload.ordine) return false;
   const remoto = payload.ordine;
+  if (!remoto.id) return false;
   if (!data.ordini) data.ordini = [];
   const esistente = data.ordini.find(o => o.id === remoto.id);
   const isModifica = !!esistente;
+  // Dedup: già processato in questa sessione e nessun update più recente
+  const dedupKey = remoto.id + '|' + (remoto.updatedAt || remoto.createdAt || '');
+  if (ntfyProcessedIds.has(dedupKey)) return false;
+  ntfyProcessedIds.add(dedupKey);
+  if (ntfyProcessedIds.size > 500) {
+    // mantieni gli ultimi 500 per non esplodere
+    const arr = Array.from(ntfyProcessedIds);
+    ntfyProcessedIds.clear();
+    arr.slice(-400).forEach(k => ntfyProcessedIds.add(k));
+  }
   if (esistente) {
     if ((remoto.updatedAt || remoto.createdAt || '') <= (esistente.updatedAt || esistente.createdAt || '')) return false;
     Object.assign(esistente, remoto);
@@ -1860,19 +1902,32 @@ async function attivaNotificheBrowser() {
   render();
 }
 
-function showOrdineNotification(ordine, clienteNome, isModifica) {
+async function showOrdineNotification(ordine, clienteNome, isModifica) {
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
   const titolo = isModifica ? `✏️ Ordine modificato da ${clienteNome}` : `🆕 Nuovo ordine da ${clienteNome}`;
   const corpo = `${(ordine.righe || []).length} prodotti · € ${fmtEur(ordine.totale || 0)} · per ${fmtDate(ordine.dataConsegna)}`;
   const icon = "data:image/svg+xml;utf8," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='42' fill='#1B3A6B'/><circle cx='96' cy='96' r='70' fill='none' stroke='#E8A020' stroke-width='8'/><path d='M42 86 Q42 132 96 132 Q150 132 150 86 Q150 108 122 116 Q96 120 70 116 Q42 108 42 86' fill='#E8A020'/></svg>");
+  const opts = {
+    body: corpo,
+    tag: 'ordine-' + ordine.id,
+    icon, badge: icon,
+    renotify: true,
+    vibrate: [200, 100, 200],
+    data: { ordineId: ordine.id, page: 'ordini' },
+  };
+  // Preferisci il Service Worker (richiesto su iOS PWA + funziona in background)
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && typeof reg.showNotification === 'function') {
+        await reg.showNotification(titolo, opts);
+        return;
+      }
+    } catch(e) { console.warn('SW notification failed, fallback:', e); }
+  }
+  // Fallback per browser senza SW (es. desktop senza PWA)
   try {
-    const n = new Notification(titolo, {
-      body: corpo,
-      tag: 'ordine-' + ordine.id,
-      icon, badge: icon,
-      renotify: true,
-      vibrate: [200, 100, 200],
-    });
+    const n = new Notification(titolo, opts);
     n.onclick = () => {
       window.focus();
       currentPage = 'ordini';
@@ -2187,6 +2242,14 @@ function render() {
   if (currentPage === 'sync' && data.config.gistSync.enabled) {
     setTimeout(refreshBackupList, 100);
   }
+  // Refresh immediato ordini quando entro nella pagina Ordini
+  if (currentPage === 'ordini' && typeof recuperaOrdiniPersi === 'function') {
+    recuperaOrdiniPersi().catch(() => {});
+  }
+  // Aggiorna stato connessione real-time nella sezione Notifiche
+  if (currentPage === 'notifiche' && typeof updateNtfyStatusUI === 'function') {
+    setTimeout(updateNtfyStatusUI, 50);
+  }
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -2235,7 +2298,7 @@ function renderDashboard() {
         <div class="banner-icon" style="background:var(--red)">!</div>
         <div class="banner-content">
           <div class="banner-title" style="color:var(--red)">Ordini in ritardo</div>
-          <div>${consegneRitardo.length} ordin${consegneRitardo.length===1?'e':'i'} non ancora spedit${consegneRitardo.length===1?'o':'i'} con data di consegna passata. <a href="#" onclick="navigateTo('ordini');return false;" style="color:var(--navy);font-weight:600">Controlla &rarr;</a></div>
+          <div>${consegneRitardo.length} ordin${consegneRitardo.length===1?'e':'i'} non ancora spedit${consegneRitardo.length===1?'o':'i'} con data di consegna passata. <a href="#" onclick="vaiOrdiniRitardo();return false;" style="color:var(--navy);font-weight:600">Controlla &rarr;</a></div>
         </div>
       </div>
     ` : ''}
@@ -3374,6 +3437,7 @@ function deleteSped(id) {
    ════════════════════════════════════════════════════════════════════ */
 let ordiniFilter = { search: '', clienteId: '', stato: '', giorno: '' };
 let ordiniTab = 'oggi';
+let scrollAOrdiniRitardo = false;
 
 function totaleOrdine(o) {
   return (o.righe || []).reduce((s, r) => s + (parseFloat(r.prezzo) || 0) * (parseInt(r.quantita) || 0), 0);
@@ -3392,11 +3456,18 @@ function inizialiCliente(c) {
 }
 
 function renderOrdini() {
+  // Migrazione naming: vecchio tab 'tabella' → 'prossimi'
+  if (ordiniTab === 'tabella') ordiniTab = 'prossimi';
+  const oggi = oggiISO();
+  const countProssimi = data.ordini.filter(o => o.dataConsegna >= oggi && o.stato === 'programmato').length;
+  const countStorici = data.ordini.filter(o => o.stato === 'consegnato' || o.stato === 'annullato' || (o.dataConsegna < oggi && o.stato === 'programmato')).length;
+  const countRitardo = data.ordini.filter(o => o.dataConsegna < oggi && o.stato === 'programmato').length;
+  const countOggi = data.ordini.filter(o => o.dataConsegna === oggi && o.stato === 'programmato').length;
   return `
     <div class="page-header">
       <div>
         <div class="page-title">Ordini</div>
-        <div class="page-subtitle"><strong style="text-transform:capitalize;color:var(--navy)">${dataOggiLeggibile()}</strong> · ${data.ordini.filter(o => o.dataConsegna === oggiISO() && o.stato === 'programmato').length} da consegnare oggi · ${data.ordini.length} totali</div>
+        <div class="page-subtitle"><strong style="text-transform:capitalize;color:var(--navy)">${dataOggiLeggibile()}</strong> · ${countOggi} da consegnare oggi · ${data.ordini.length} totali${countRitardo > 0 ? ` · <a href="#" onclick="vaiOrdiniRitardo();return false;" style="color:var(--red);font-weight:600">${countRitardo} in ritardo →</a>` : ''}</div>
       </div>
       <button class="btn btn--amber" onclick="openOrdineModal()" ${data.clienti.length===0?'disabled':''}>+ Nuovo ordine</button>
     </div>
@@ -3413,11 +3484,21 @@ function renderOrdini() {
 
     <div style="display:flex;gap:8px;margin-bottom:20px;border-bottom:1px solid var(--grey-bord);flex-wrap:wrap">
       <button class="btn ${ordiniTab==='oggi'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="ordiniTab='oggi';render()">🎯 Oggi</button>
-      <button class="btn ${ordiniTab==='tabella'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="ordiniTab='tabella';render()">📋 Tutti gli ordini (${data.ordini.length})</button>
+      <button class="btn ${ordiniTab==='prossimi'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="ordiniTab='prossimi';render()">📅 Prossimi ordini (${countProssimi})</button>
+      <button class="btn ${ordiniTab==='storici'?'btn--amber':'btn--ghost'} btn--small" style="border-radius:8px 8px 0 0" onclick="ordiniTab='storici';render()">📦 Storici (${countStorici})</button>
     </div>
 
-    ${ordiniTab === 'oggi' ? renderOrdiniOggi() : renderOrdiniTabella()}
+    ${ordiniTab === 'oggi' ? renderOrdiniOggi()
+      : ordiniTab === 'storici' ? renderOrdiniStorici()
+      : renderOrdiniProssimi()}
   `;
+}
+
+function vaiOrdiniRitardo() {
+  ordiniTab = 'storici';
+  scrollAOrdiniRitardo = true;
+  if (currentPage !== 'ordini') navigateTo('ordini');
+  else render();
 }
 
 function renderOrdiniOggi() {
@@ -3629,7 +3710,7 @@ function sezioneOrdiniHTML(titolo, ordini, opts) {
   `;
 }
 
-function renderOrdiniTabella() {
+function renderOrdiniProssimi() {
   const oggi = oggiISO();
   const domani = isoOffset(1);
   const dopodomani = isoOffset(2);
@@ -3687,8 +3768,9 @@ function renderOrdiniTabella() {
     return filtri + sezioneOrdiniHTML(labelGiorno, ordGiorno, { mostraData: false });
   }
 
-  // Vista 4 sezioni (Oggi/Domani/Dopodomani/Prossimi)
-  const ordini = applicaFiltriOrdini([...data.ordini]);
+  // Vista 4 sezioni (Oggi/Domani/Dopodomani/Prossimi) — solo ordini ancora da consegnare
+  const attivi = data.ordini.filter(o => o.stato === 'programmato' && o.dataConsegna >= oggi);
+  const ordini = applicaFiltriOrdini([...attivi]);
   const sortByOra = (a, b) => (a.oraConsegna || '99:99').localeCompare(b.oraConsegna || '99:99');
   const ordOggi       = ordini.filter(o => o.dataConsegna === oggi).sort(sortByOra);
   const ordDomani     = ordini.filter(o => o.dataConsegna === domani).sort(sortByOra);
@@ -3707,6 +3789,110 @@ function renderOrdiniTabella() {
     sezioneOrdiniHTML(`☀ Domani · ${fmtPrima(domani)}`, ordDomani, { mostraData: false, klass: 'cliente-sezione--verde' }) +
     sezioneOrdiniHTML(`⏭ Dopodomani · ${fmtPrima(dopodomani)}`, ordDopodomani, { mostraData: false, klass: 'cliente-sezione--blu' }) +
     sezioneOrdiniHTML(`📅 Prossimi (dal ${fmtPrima(isoOffset(3))})`, ordProssimi, { mostraData: true });
+}
+
+function renderOrdiniStorici() {
+  const oggi = oggiISO();
+
+  // Stessi filtri di renderOrdiniProssimi
+  const filtri = `
+    <div class="card" style="margin-bottom:20px">
+      <div class="form-grid">
+        <div class="field">
+          <label class="field-label">Cerca</label>
+          <input type="text" class="field-input" placeholder="Numero, cliente, note..."
+            value="${escapeHtml(ordiniFilter.search)}" oninput="ordiniFilter.search=this.value;render()">
+        </div>
+        <div class="field">
+          <label class="field-label">Cliente</label>
+          <select class="field-select" onchange="ordiniFilter.clienteId=this.value;render()">
+            <option value="">Tutti</option>
+            ${data.clienti.map(c => `<option value="${c.id}" ${ordiniFilter.clienteId===c.id?'selected':''}>${escapeHtml(c.ragioneSociale)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Stato</label>
+          <select class="field-select" onchange="ordiniFilter.stato=this.value;render()">
+            <option value="">Tutti</option>
+            ${ORDINE_STATI.map(s => `<option value="${s.value}" ${ordiniFilter.stato===s.value?'selected':''}>${s.label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Vai a un giorno specifico</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input type="date" class="field-input" value="${escapeHtml(ordiniFilter.giorno)}"
+              onchange="ordiniFilter.giorno=this.value;render()" style="flex:1">
+            ${ordiniFilter.giorno ? `<button class="btn btn--ghost btn--small" onclick="ordiniFilter.giorno='';render()" title="Mostra tutti">×</button>` : ''}
+          </div>
+        </div>
+      </div>
+      ${(ordiniFilter.search || ordiniFilter.clienteId || ordiniFilter.stato || ordiniFilter.giorno) ?
+        `<div style="margin-top:12px"><button class="btn btn--ghost btn--small" onclick="ordiniFilter={search:'',clienteId:'',stato:'',giorno:''};render()">× Cancella filtri</button></div>` : ''}
+    </div>
+  `;
+
+  const sortByDataDesc = (a, b) =>
+    ((b.dataConsegna || '') + (b.oraConsegna || '')).localeCompare((a.dataConsegna || '') + (a.oraConsegna || ''));
+
+  // Vista per giorno specifico
+  if (ordiniFilter.giorno) {
+    const ordGiorno = applicaFiltriOrdini(data.ordini.filter(o => o.dataConsegna === ordiniFilter.giorno))
+      .sort((a, b) => (a.oraConsegna || '99:99').localeCompare(b.oraConsegna || '99:99'));
+    const labelGiorno = `📅 ${formattaLabelGiorno(ordiniFilter.giorno)}`;
+    return filtri + sezioneOrdiniHTML(labelGiorno, ordGiorno, { mostraData: false });
+  }
+
+  // Sezioni storici
+  const tutti = applicaFiltriOrdini([...data.ordini]);
+  const ritardo = tutti
+    .filter(o => o.stato === 'programmato' && o.dataConsegna < oggi)
+    .sort(sortByDataDesc);
+  const consegnati = tutti
+    .filter(o => o.stato === 'consegnato')
+    .sort(sortByDataDesc)
+    .slice(0, 100);  // limita per performance
+  const annullati = tutti
+    .filter(o => o.stato === 'annullato')
+    .sort(sortByDataDesc)
+    .slice(0, 50);
+
+  // Scroll automatico alla sezione ritardo (innescato da banner Dashboard)
+  if (scrollAOrdiniRitardo && ritardo.length > 0) {
+    setTimeout(() => {
+      const el = document.getElementById('sezione-ritardi');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollAOrdiniRitardo = false;
+    }, 120);
+  }
+
+  const sezioneRitardo = ritardo.length > 0 ? `
+    <div id="sezione-ritardi" style="background:var(--red-bg);border-left:4px solid var(--red);border-radius:8px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:700;color:var(--red);font-size:16px;margin-bottom:8px">🔴 In ritardo (${ritardo.length})</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Ordini con data di consegna passata ma ancora in stato "Da consegnare". Conferma la consegna o annulla.</div>
+    </div>
+    ${sezioneOrdiniHTML('', ritardo, { mostraData: true, mostraConsegna: true })}
+  ` : '';
+
+  const sezioneConsegnati = consegnati.length > 0
+    ? sezioneOrdiniHTML(`✓ Consegnati (${consegnati.length}${consegnati.length === 100 ? '+, ultimi 100' : ''})`, consegnati, { mostraData: true })
+    : '';
+
+  const sezioneAnnullati = annullati.length > 0
+    ? sezioneOrdiniHTML(`✗ Annullati (${annullati.length}${annullati.length === 50 ? '+, ultimi 50' : ''})`, annullati, { mostraData: true })
+    : '';
+
+  const tot = ritardo.length + consegnati.length + annullati.length;
+  if (tot === 0) {
+    return filtri + `
+      <div class="card empty">
+        <div class="empty-icon">📦</div>
+        <div class="empty-title">Nessun ordine nello storico</div>
+        <div class="empty-text">Ordini consegnati, annullati o in ritardo compariranno qui.</div>
+      </div>
+    `;
+  }
+
+  return filtri + sezioneRitardo + sezioneConsegnati + sezioneAnnullati;
 }
 
 function formattaLabelGiorno(isoDate) {
@@ -5196,6 +5382,15 @@ function renderNotifiche() {
       </div>
     ` : ''}
 
+    <div class="card" style="background:var(--light-bg);margin-bottom:20px">
+      <div class="card-h">📲 Per ricevere notifiche anche con app chiusa</div>
+      <div style="font-size:13px;line-height:1.6;color:var(--muted)">
+        <p style="margin-bottom:8px"><strong>Su iPhone</strong>: apri questa app in Safari, tocca <strong>Condividi</strong> → <strong>Aggiungi a Home</strong>. Poi aprila SEMPRE dall'icona della home: solo così riceverai notifiche di sistema con l'app chiusa (richiede iOS 16.4+).</p>
+        <p style="margin-bottom:8px"><strong>Su Android</strong>: Chrome ti propone "Installa app" — accetta. Una volta installata, le notifiche di sistema funzionano anche con browser chiuso.</p>
+        <p><strong>Stato connessione real-time</strong>: <span id="ntfyConnStatus">⏳ in connessione...</span></p>
+      </div>
+    </div>
+
     ${notifiche.length === 0 ? `
       <div class="empty">
         <div class="empty-icon">🔔</div>
@@ -6180,10 +6375,15 @@ if ('serviceWorker' in navigator) {
     });
     self.addEventListener('notificationclick', e => {
       e.notification.close();
-      e.waitUntil(clients.matchAll({type: 'window'}).then(list => {
+      const targetPage = (e.notification.data && e.notification.data.page) || 'ordini';
+      const ordineId = e.notification.data && e.notification.data.ordineId || '';
+      e.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(list => {
         const c = list.find(x => x.url.includes('index.html')) || list[0];
-        if (c) return c.focus();
-        return clients.openWindow('./index.html');
+        if (c) {
+          c.postMessage({ type: 'navigate', page: targetPage, ordineId });
+          return c.focus();
+        }
+        return clients.openWindow('./index.html?notif=' + encodeURIComponent(targetPage));
       }));
     });
   `;
@@ -6202,6 +6402,9 @@ render();
 
 // Save data periodically as safety
 setInterval(() => saveData(), 60000);
+
+// Aggiorna l'indicatore stato connessione real-time ogni 5s
+setInterval(() => { if (currentPage === 'notifiche') updateNtfyStatusUI(); }, 5000);
 
 // Online/offline detection per stato sync
 window.addEventListener('online', () => {
@@ -6223,10 +6426,39 @@ if (data.config.gistSync.enabled && data.config.gistSync.pat && data.config.gist
 // Sync real-time ordini cliente → fornaio via ntfy.sh (zero setup)
 saveData();   // Persiste tenantId se è stato appena generato
 recuperaOrdiniPersi().then(() => ntfyConnect());
-window.addEventListener('online', () => ntfyConnect());
+startNtfyPolling();
+window.addEventListener('online', () => { ntfyConnect(); recuperaOrdiniPersi(); });
 window.addEventListener('visibilitychange', () => {
-  if (!document.hidden && (!ntfyWs || ntfyWs.readyState !== 1)) ntfyConnect();
+  if (!document.hidden) {
+    if (!ntfyWs || ntfyWs.readyState !== 1) ntfyConnect();
+    recuperaOrdiniPersi();   // fetch immediato al ritorno foreground
+  }
 });
+
+// Ricevi click su notifica di sistema dal SW → naviga su Ordini
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (ev) => {
+    if (ev.data && ev.data.type === 'navigate' && ev.data.page) {
+      ordiniTab = 'prossimi';
+      currentPage = ev.data.page;
+      render();
+    }
+  });
+}
+
+// Se aperto da link "?notif=ordini" (PWA cold start da click su notifica)
+(function() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const notif = p.get('notif');
+    if (notif) {
+      currentPage = notif;
+      ordiniTab = 'prossimi';
+      render();
+      history.replaceState(null, '', window.location.pathname);
+    }
+  } catch(_) {}
+})();
 </script>
 
 </body>
