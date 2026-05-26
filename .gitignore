@@ -32,3 +32,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local preview screenshots (regenerable via scripts/capture-preview.mjs)
+/preview/
